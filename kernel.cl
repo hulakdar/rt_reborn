@@ -146,8 +146,6 @@ static void		intersect(	constant t_object *obj,
 	
 	if (current < 0.0 || current > *closest_dist)
 		return ;
-		
-		
 	*closest_dist = current;
 	*closest = obj;
 }
@@ -197,8 +195,8 @@ void	first_intersection(	t_scene scene,
 	hit.color = (double3)(0, 0, 0);
 	hit.mask = (double3)(1.f, 1.f, 1.f);
 	hit.iterations = 1;
-	hit.seeds[0] = coords.x;
-	hit.seeds[1] = coords.y;
+	hit.seeds[0] += coords.x * (uint)&coords + (uint)&coords;
+	hit.seeds[1] += coords.y * (uint)&coords + (uint)&coords;
 	trace_ray(camera.origin, ray_dir, scene, &hit);
 	hits[i] = hit;
 }
