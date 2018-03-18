@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/16 18:50:41 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/18 19:00:00 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,24 +44,7 @@ int main(void)
 	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &hits);
 	clSetKernelArg(extended.kernel, 2, sizeof(cl_mem), &buff);
 
-	rt_cl_push_task(&primary, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&extended, &job_size);
+		rt_cl_push_task(&primary, &job_size);
 	rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
 
 	rt_cl_join(&info);
@@ -97,7 +80,11 @@ int main(void)
 		SDL_UpdateTexture(canvas, NULL, pixels, width << 2);
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, canvas, NULL, NULL);
+		rt_cl_push_task(&extended, &job_size);
+		rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
+
 		SDL_RenderPresent(renderer);
+		rt_cl_join(&info);
 	}
 	SDL_DestroyTexture(canvas);
 	SDL_DestroyRenderer(renderer);

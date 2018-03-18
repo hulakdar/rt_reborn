@@ -39,10 +39,10 @@ typedef struct		s_hit
 
 
 static constant t_object	objs[] = {
-	{{0,0,0}, {1,1,1}, {1,1,1}, {0,0,15}, 2, 4, 0},
-	{{0,0,0}, {1,1,1}, {1,1,1}, {0,0,150}, 10, 100, 0},
-	{{0,0,0}, {1,1,1}, {1,1,1}, {0,0,15}, 2, 4, 0},
-	{{0,0,0}, {1,1,1}, {1,1,1}, {0,0,15}, 2, 4, 0}
+	{{0,0,0}, {1,1,1}, {0,0,0}, {0,0,15}, 10, 4, 0},
+	{{0,0,0}, {1,1,1}, {1,1,1}, {50,50,0}, 49, 4, 0},
+	{{0,0,0}, {1,1,1}, {1,1,1}, {-10,-10,50}, 10, 100, 0},
+	{{0,0,0}, {1,1,1}, {1,1,1}, {5,-5,15}, 2, 4, 0}
 };
 
 static constant t_camera 	camera = {
@@ -124,11 +124,10 @@ static double  sphere_intersect(constant t_object *obj,
 	b = 2 * dot(ray_dir, oc);
 	c = dot(oc, oc) - (obj->radius * obj->radius);
 	ft_roots(&t, a, b, c);
-	if (t.x < 0.0 || t.y > t.x)
-		t.x = t.y;
-	if (t.x < 0.0)
-		return (-1);
-	return (t.x);
+	if ((t.x < 0.0 && t.y >= 0.0) || (t.y < 0.0 && t.x >= 0.0))
+		return t.x > t.y ? t.x : t.y;
+	else
+		return t.x < t.y ? t.x : t.y;
 }
 
 static double3	normal(constant t_object *obj, double3 pos)
@@ -144,32 +143,36 @@ static void		intersect(	constant t_object *obj,
 {
 	double current = sphere_intersect(obj, ray_dir, ray_orig);
 	
-	/*
-	if (current < 0.001 || current > *closest_dist)
+	
+	if (current < 0.0 || current > *closest_dist)
 		return ;
-		*/
 		
-	*closest_dist = 10;
+		
+	*closest_dist = current;
 	*closest = obj;
 }
 
 static void	trace_ray(double3 ray_orig, double3 ray_dir, t_scene scene, t_hit *hit)
 {
-	int				objnum = 2;
+	int					objnum = 4;
 	constant t_object	*obj = &objs[0];
 	constant t_object	*closest = NULL;
-	double			closest_dist;
+	double				closest_dist;
 
 	closest_dist = INFINITY;
 	for (int i = 0; i < objnum; i++)
 		intersect(&obj[i], ray_dir, ray_orig, &closest, &closest_dist);
 	hit->object = closest;
-	if (closest)
+	if (closest && closest_dist < INFINITY)
 	{
 		hit->pos = ray_orig + ray_dir * closest_dist;
 		hit->normal = normal(obj, ray_orig);
 		hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal :
 			hit->normal * (-1.0f);
+		hit->pos += hit->normal *  0.0003f;
+		hit->color += hit->mask * closest->emission;
+		hit->mask *= closest->color;
+		hit->mask *= hit->mask * fabs(dot(ray_dir, hit->normal));
 	}
 }
 
@@ -192,17 +195,15 @@ void	first_intersection(	t_scene scene,
 	t_hit	hit;
 	
 	hit.color = (double3)(0, 0, 0);
+	hit.mask = (double3)(1.f, 1.f, 1.f);
 	hit.iterations = 1;
 	hit.seeds[0] = coords.x;
 	hit.seeds[1] = coords.y;
 	trace_ray(camera.origin, ray_dir, scene, &hit);
-	hit.mask = (double3)(1.f, 1.f, 1.f);
-	hit.color += hit.mask * hit.object->emission;
-	hit.mask = hit.mask * dot(ray_dir, hit.normal);
 	hits[i] = hit;
 }
 
-__kernel __attribute__((vec_type_hint ( double3 )))
+__kernel /*__attribute__((vec_type_hint ( double3 )))*/
 void	path_tracing(	t_scene scene,
 						global t_hit *hits,
 						global int *image)
@@ -211,15 +212,15 @@ void	path_tracing(	t_scene scene,
 	uint2	coords = {i % camera.canvas.x, i / camera.canvas.x};
 	t_hit 	hit = hits[i];
 
-	if (hit.iterations > 8 || hit.object == NULL)
+	if (__builtin_expect(hit.iterations > 8 || !hit.object, 0))
 	{
-		hit.color = min(1.0, hit.color / hit.iterations);
-		image[i] += upsample(
+		hit.color = min(1.0, (hit.color)) * 255;
+		image[i] |= upsample(
 			upsample((unsigned char)0,
-					 (unsigned char)(hit.color.x * 255)),
-			upsample((unsigned char)(hit.color.y * 255),
-					 (unsigned char)(0)));
-		return ;
+					 (unsigned char)(hit.color.x)),
+			upsample((unsigned char)(hit.color.y),
+					 (unsigned char)(hit.color.z)));
+		return first_intersection(scene, hits);
 	}
 	float rand1 = 2.0f * M_PI * get_random(&hit.seeds[0], &hit.seeds[1]);
 	float rand2 = get_random(&hit.seeds[0], &hit.seeds[1]);
@@ -233,12 +234,8 @@ void	path_tracing(	t_scene scene,
 						v * native_sin(rand1) * rand2s +
 						w * native_sqrt(1.0f - rand2));
 	trace_ray(hit.pos, ray_dir, scene, &hit);
-	hit.seeds[0] = coords.x;
-	hit.seeds[1] = coords.y;
 	hit.iterations = hit.iterations + 1;
 	hits[i] = hit;
-	if (!i)
-		printf("i'm in extended\n");
 }
 
 __kernel
