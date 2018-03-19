@@ -30,19 +30,25 @@ typedef struct		s_hit
 	double3			normal;
 	double3			mask;
 	double3			color;
+	double3			color_accum;
 	constant t_object	*object;
 	uint			seeds[2];
 	unsigned char	iterations;
+	unsigned long	samples;
 }					t_hit;
 
 #define NULL ((void *)0)
 
 
 static constant t_object	objs[] = {
-	{{0,0,0}, {1,1,1}, {0,0,0}, {0,0,15}, 10, 4, 0},
-	{{0,0,0}, {1,1,1}, {1,1,1}, {50,50,0}, 49, 4, 0},
-	{{0,0,0}, {1,1,1}, {1,1,1}, {-10,-10,50}, 10, 100, 0},
-	{{0,0,0}, {1,1,1}, {1,1,1}, {5,-5,15}, 2, 4, 0}
+	{{0,0,0}, {1,0,1}, {0,0,0}, {0,0,2030}, 2000, 4, 0},
+	{{0,0,0}, {0,1,1}, {0,0,0}, {2015,0,15}, 2000, 4, 0},
+	{{0,0,0}, {1,1,0}, {0,0,0}, {-2015,0,15}, 2000, 100, 0},
+	{{0,0,0}, {1,0,0}, {0,0,0}, {0,2015,15}, 2000, 4, 0},
+	{{0,0,0}, {0,0,0}, {0,0,0}, {0,-2015,15}, 2000, 100, 0},
+	{{0,0,0}, {1,0.2,0.7}, {0,0,0}, {-4,0,15}, 3, 100, 0},
+	{{0,0,0}, {0.5,0,0.5}, {0,0,0}, {5,0,15}, 3, 4, 0},
+	{{0,0,0}, {1,1,1}, {1,1,1}, {0,25,15}, 15, 100, 0}
 };
 
 static constant t_camera 	camera = {
@@ -152,7 +158,7 @@ static void		intersect(	constant t_object *obj,
 
 static void	trace_ray(double3 ray_orig, double3 ray_dir, t_scene scene, t_hit *hit)
 {
-	int					objnum = 4;
+	int					objnum = sizeof(objs) / sizeof(t_object);
 	constant t_object	*obj = &objs[0];
 	constant t_object	*closest = NULL;
 	double				closest_dist;
@@ -167,18 +173,22 @@ static void	trace_ray(double3 ray_orig, double3 ray_dir, t_scene scene, t_hit *h
 		hit->normal = normal(obj, ray_orig);
 		hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal :
 			hit->normal * (-1.0f);
-		hit->pos += hit->normal *  0.0003f;
-		hit->color += hit->mask * closest->emission;
+		hit->pos += hit->normal *  0.000003f;
 		hit->mask *= closest->color;
-		hit->mask *= hit->mask * fabs(dot(ray_dir, hit->normal));
+		hit->color += hit->mask * closest->emission;
+		hit->mask *= fabs(dot(ray_dir, hit->normal));
 	}
 }
 
-static double3	construct_ray(uint2 coords, t_camera camera)
+static double3	construct_ray(uint2 coords, t_camera camera, t_hit *hit)
 {
+	hit->color = (double3)(0, 0, 0);
+	hit->mask = (double3)(1, 1, 1);
+	hit->iterations = 1;
+	hit->pos = camera.origin;
 	return (normalize((double3)
-		((((coords.x + 0.5) / camera.canvas.x) * 2 - 1) * (camera.canvas.x / camera.canvas.y),
-		1 - 2 * ((coords.y + 0.5) / camera.canvas.y),
+		((((coords.x + get_random(&hit->seeds[0], &hit->seeds[1])) / camera.canvas.x) * 2 - 1) * (camera.canvas.x / camera.canvas.y),
+		1 - 2 * ((coords.y + get_random(&hit->seeds[0], &hit->seeds[1])) / camera.canvas.y),
 		1.0)
 	));
 }
@@ -189,50 +199,56 @@ void	first_intersection(	t_scene scene,
 {
 	int		i = get_global_id(0);
 	uint2	coords = {i % camera.canvas.x, i / camera.canvas.x};
-	double3	ray_dir = construct_ray(coords, camera);
 	t_hit	hit;
-	
-	hit.color = (double3)(0, 0, 0);
-	hit.mask = (double3)(1.f, 1.f, 1.f);
-	hit.iterations = 1;
 	hit.seeds[0] += coords.x * (uint)&coords + (uint)&coords;
 	hit.seeds[1] += coords.y * (uint)&coords + (uint)&coords;
+	double3	ray_dir = construct_ray(coords, camera, &hit);
+	
+	hit.color_accum = (double3)(0,0,0);
+	hit.samples = 1;
 	trace_ray(camera.origin, ray_dir, scene, &hit);
 	hits[i] = hit;
 }
 
-__kernel /*__attribute__((vec_type_hint ( double3 )))*/
+__kernel __attribute__((vec_type_hint ( double3 )))
 void	path_tracing(	t_scene scene,
 						global t_hit *hits,
 						global int *image)
 {
 	int		i = get_global_id(0);
 	uint2	coords = {i % camera.canvas.x, i / camera.canvas.x};
+	double3	ray_dir;
 	t_hit 	hit = hits[i];
 
-	if (__builtin_expect(hit.iterations > 8 || !hit.object, 0))
+	if (__builtin_expect(hit.iterations > 64 || !hit.object || fast_length(convert_float3(hit.mask)) < 0.01, 0))
 	{
-		hit.color = min(1.0, (hit.color)) * 255;
-		image[i] |= upsample(
-			upsample((unsigned char)0,
-					 (unsigned char)(hit.color.x)),
-			upsample((unsigned char)(hit.color.y),
-					 (unsigned char)(hit.color.z)));
-		return first_intersection(scene, hits);
+		hit.color_accum += min(hit.color, 1.0);
+		if (fast_length(convert_float3(hit.color)) > 0.000003)
+			hit.samples++;
+		hit.color = (hit.color_accum / hit.samples) * 255;
+		image[i] = upsample(
+				upsample((unsigned char)0,
+					(unsigned char)(hit.color.x)),
+				upsample((unsigned char)(hit.color.y),
+					(unsigned char)(hit.color.z)));
+		ray_dir = construct_ray(coords, camera, &hit);
 	}
-	float rand1 = 2.0f * M_PI * get_random(&hit.seeds[0], &hit.seeds[1]);
-	float rand2 = get_random(&hit.seeds[0], &hit.seeds[1]);
-	float rand2s = native_sqrt(rand2);
-	double3 w = hit.normal;
-	double3 axis = fabs(w.x) > 0.1f ? (double3)(0.0f, 1.0f, 0.0f)
-		: (double3)(1.0f, 0.0f, 0.0f);
-	double3 u = normalize(cross(axis, w));
-	double3 v = cross(w, u);
-	double3 ray_dir = normalize(u * native_cos(rand1) * rand2s +
-						v * native_sin(rand1) * rand2s +
-						w * native_sqrt(1.0f - rand2));
+	else
+	{
+		float rand1 = 2.0f * M_PI * get_random(&hit.seeds[0], &hit.seeds[1]);
+		float rand2 = get_random(&hit.seeds[0], &hit.seeds[1]);
+		float rand2s = native_sqrt(rand2);
+		double3 w = hit.normal;
+		double3 axis = fabs(w.x) > 0.1f ? (double3)(0.0f, 1.0f, 0.0f)
+			: (double3)(1.0f, 0.0f, 0.0f);
+		double3 u = normalize(cross(axis, w));
+		double3 v = cross(w, u);
+		ray_dir = normalize(u * native_cos(rand1) * rand2s +
+				v * native_sin(rand1) * rand2s +
+				w * native_sqrt(1.0f - rand2));
+	}
 	trace_ray(hit.pos, ray_dir, scene, &hit);
-	hit.iterations = hit.iterations + 1;
+	hit.iterations++;
 	hits[i] = hit;
 }
 

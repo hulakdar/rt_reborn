@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/18 19:00:00 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/19 17:41:21 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,7 +35,7 @@ int main(void)
 	primary = rt_cl_create_kernel(&info, "first_intersection");
 	extended = rt_cl_create_kernel(&info, "path_tracing");
 
-	cl_mem	hits = rt_cl_malloc_read(&info, 160 * job_size);
+	cl_mem	hits = rt_cl_malloc_read(&info, 192 * job_size);
 	cl_mem	buff = rt_cl_malloc_read(&info, sizeof(int) * job_size);
 
 	clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
@@ -44,7 +44,10 @@ int main(void)
 	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &hits);
 	clSetKernelArg(extended.kernel, 2, sizeof(cl_mem), &buff);
 
-		rt_cl_push_task(&primary, &job_size);
+	rt_cl_push_task(&primary, &job_size);
+	rt_cl_push_task(&extended, &job_size);
+	rt_cl_push_task(&extended, &job_size);
+	rt_cl_push_task(&extended, &job_size);
 	rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
 
 	rt_cl_join(&info);
@@ -82,9 +85,9 @@ int main(void)
 		SDL_RenderCopy(renderer, canvas, NULL, NULL);
 		rt_cl_push_task(&extended, &job_size);
 		rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
+		rt_cl_join(&info);
 
 		SDL_RenderPresent(renderer);
-		rt_cl_join(&info);
 	}
 	SDL_DestroyTexture(canvas);
 	SDL_DestroyRenderer(renderer);
