@@ -6,23 +6,115 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/19 17:41:21 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/21 13:07:51 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#define T_HIT_SIZE 160
 
 #include "rt.h"
+
+
+union    u_color
+{
+	 unsigned int color;
+	  unsigned char channels[4];
+};
+
+void smooth(int *addr, int win_w, int win_h)
+{
+	int i;
+	int j;
+	int *new;
+	int arr[win_w][win_h];
+	union    u_color col[9];
+
+	i = 0;
+	new = addr;
+	while (i < win_w)
+	{
+		j = 0;
+		while (j < win_h)
+		{
+			arr[i][j] = *new;
+			new++;
+			j++;
+		}
+		i++;
+	}
+	i = 1;
+	while (i < win_w - 1)
+	{
+		j = 1;
+		while (j < win_h - 1)
+		{
+			col[0].color = arr[i][j - 1];
+			col[1].color = arr[i][j];
+			col[2].color = arr[i][j + 1];
+			col[3].color = arr[i - 1][j];
+			col[4].color = arr[i + 1][j];
+			/*
+			col[5].color = arr[i - 1][j - 1];
+			col[6].color = arr[i - 1][j + 1];
+			col[7].color = arr[i + 1][j - 1];
+			col[8].color = arr[i + 1][j + 1];
+			*/
+			col[1].channels[0] = (col[0].channels[0] + col[1].channels[0] + col[2].channels[0] + col[3].channels[0] + col[4].channels[0]) / 5;
+			col[1].channels[1] = (col[0].channels[1] + col[1].channels[1] + col[2].channels[1] + col[3].channels[1] + col[4].channels[1]) / 5;
+			col[1].channels[2] = (col[0].channels[2] + col[1].channels[2] + col[2].channels[2] + col[3].channels[2] + col[4].channels[2]) / 5;
+			arr[i][j] = col[1].color;
+			j++;
+		}
+		i++;
+	}
+	/*
+	i = 1;
+	while (i < win_w - 1)
+	{
+		j = 1;
+		while (j < win_h - 1)
+		{
+			col[0].color = arr[i][j - 1];
+			col[1].color = arr[i][j];
+			col[2].color = arr[i][j + 1];
+			col[3].color = arr[i - 1][j];
+			col[4].color = arr[i + 1][j];
+			col[5].color = arr[i - 1][j - 1];
+			col[6].color = arr[i - 1][j + 1];
+			col[7].color = arr[i + 1][j - 1];
+			col[8].color = arr[i + 1][j + 1];
+			col[1].channels[0] = (col[0].channels[0] + col[1].channels[0] + col[2].channels[0] + col[3].channels[0] + col[4].channels[0] + col[5].channels[0] + col[6].channels[0] + col[7].channels[0] + col[8].channels[0]) / 9;
+			col[1].channels[1] = (col[0].channels[1] + col[1].channels[1] + col[2].channels[1] + col[3].channels[1] + col[4].channels[1] + col[5].channels[1] + col[6].channels[1] + col[7].channels[1] + col[8].channels[1]) / 9;
+			col[1].channels[2] = (col[0].channels[2] + col[1].channels[2] + col[2].channels[2] + col[3].channels[2] + col[4].channels[2] + col[5].channels[2] + col[6].channels[2] + col[7].channels[2] + col[8].channels[2]) / 9;
+			arr[i][j] = col[1].color;
+			j++;
+		}
+		i++;
+	}
+	*/
+	i = 0;
+	new = addr;
+	while (i < win_w)
+	{
+		j = 0;
+		while (j < win_h)
+		{
+			*new = arr[i][j];
+			new++;
+			j++;
+		}
+		i++;
+	}
+}
 
 int main(void)
 {
 	SDL_Window		*window;
 	SDL_Renderer	*renderer;
 	SDL_Texture		*canvas;
-	const int		width = 500;
-	const int		height = 500;
+	const int		width = 1000;
+	const int		height = 1000;
 	size_t			job_size = width * height;
-	int				pixels[job_size];
+	cl_int			pixels[job_size];
 	t_cl_info		info;
 	t_kernel	 	primary;
 	t_kernel	 	extended;
@@ -30,13 +122,13 @@ int main(void)
 	t_scene			scene;
 
     rt_cl_init(&info);
-    rt_cl_compile(&info, "kernel.cl");
+    rt_cl_compile(&info, (char *)noc_file_dialog_open(NOC_FILE_DIALOG_OPEN, NULL, "."));
 	size = rt_cl_create_kernel(&info, "t_hit_size");
 	primary = rt_cl_create_kernel(&info, "first_intersection");
 	extended = rt_cl_create_kernel(&info, "path_tracing");
 
-	cl_mem	hits = rt_cl_malloc_read(&info, 192 * job_size);
-	cl_mem	buff = rt_cl_malloc_read(&info, sizeof(int) * job_size);
+	cl_mem	hits = rt_cl_malloc_read(&info, 256 * job_size);
+	cl_mem	buff = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
 
 	clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
 	clSetKernelArg(primary.kernel, 1, sizeof(cl_mem), &hits);
@@ -75,18 +167,18 @@ int main(void)
 		height);
 
 	SDL_Event		event;
+	bzero(pixels, sizeof(pixels));
 	while (1)
 	{
-		if (SDL_PollEvent(&event))
-			if (event.type == SDL_QUIT)
+		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
 				break ;
+		for (int i = 0; i < 15; i++)
+			rt_cl_push_task(&extended, &job_size);
+		rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
+		smooth(pixels, width, height);
 		SDL_UpdateTexture(canvas, NULL, pixels, width << 2);
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, canvas, NULL, NULL);
-		rt_cl_push_task(&extended, &job_size);
-		rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
-		rt_cl_join(&info);
-
 		SDL_RenderPresent(renderer);
 	}
 	SDL_DestroyTexture(canvas);
