@@ -285,6 +285,41 @@ void	path_tracing(	t_scene scene,
 	hits[i] = hit;
 }
 
+union    u_color
+{
+	 unsigned int color;
+	 unsigned char channels[4];
+};
+
+__kernel void	smooth(global int *arr, global int *out)
+{
+	int i;
+	int j;
+
+	int win_w = 1000;
+	int win_h = 1000;
+	union    u_color col[9];
+	int		g = get_global_id(0);
+
+	i = g / win_w;
+	j = g % win_w;
+
+			col[0].color = arr[i * win_w + (j - 1)];
+			col[1].color = arr[i * win_w + j];
+			col[2].color = arr[i * win_w + j + 1];
+			col[3].color = arr[i * win_w - 1 + j];
+			col[4].color = arr[i * win_w + 1 + j];
+			col[5].color = arr[i * win_w - 1 + j - 1];
+			col[6].color = arr[i * win_w - 1 + j + 1];
+			col[7].color = arr[i * win_w + 1 + j - 1];
+			col[8].color = arr[i * win_w + 1 + j + 1];
+			col[1].channels[0] = (col[0].channels[0] + col[1].channels[0] + col[2].channels[0] + col[3].channels[0] + col[4].channels[0] + col[5].channels[0] + col[6].channels[0] + col[7].channels[0] + col[8].channels[0]) / 9;
+			col[1].channels[1] = (col[0].channels[1] + col[1].channels[1] + col[2].channels[1] + col[3].channels[1] + col[4].channels[1] + col[5].channels[1] + col[6].channels[1] + col[7].channels[1] + col[8].channels[1]) / 9;
+			col[1].channels[2] = (col[0].channels[2] + col[1].channels[2] + col[2].channels[2] + col[3].channels[2] + col[4].channels[2] + col[5].channels[2] + col[6].channels[2] + col[7].channels[2] + col[8].channels[2]) / 9;
+			out[i * win_w + j] = col[1].color;
+
+}
+
 __kernel
 void	t_hit_size(void)
 {

@@ -116,6 +116,7 @@ int main(void)
 	t_cl_info		info;
 	t_kernel	 	primary;
 	t_kernel	 	extended;
+	t_kernel	 	smooth;
 	t_kernel	 	size;
 	t_scene			scene;
 
@@ -124,20 +125,23 @@ int main(void)
 	size = rt_cl_create_kernel(&info, "t_hit_size");
 	primary = rt_cl_create_kernel(&info, "first_intersection");
 	extended = rt_cl_create_kernel(&info, "path_tracing");
+	smooth = rt_cl_create_kernel(&info, "smooth");
 
 	cl_mem	hits = rt_cl_malloc_read(&info, 256 * job_size);
 	cl_mem	buff = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
-
+	cl_mem	out = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
 	clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
 	clSetKernelArg(primary.kernel, 1, sizeof(cl_mem), &hits);
 	clSetKernelArg(extended.kernel, 0, sizeof(t_scene), &scene);
 	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &hits);
 	clSetKernelArg(extended.kernel, 2, sizeof(cl_mem), &buff);
-
+	clSetKernelArg(smooth.kernel, 0, sizeof(cl_mem), &buff);
+	clSetKernelArg(smooth.kernel, 1, sizeof(cl_mem), &out);
 	rt_cl_push_task(&primary, &job_size);
 	rt_cl_push_task(&extended, &job_size);
 	rt_cl_push_task(&extended, &job_size);
 	rt_cl_push_task(&extended, &job_size);
+	rt_cl_push_task(&smooth, &job_size);
 	rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
 
 	rt_cl_join(&info);
