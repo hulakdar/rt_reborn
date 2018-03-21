@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/02 14:37:46 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/21 12:22:15 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/21 16:49:28 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -105,8 +105,8 @@ void		rt_cl_init(t_cl_info *info)
 				&info->num_platforms));
 	check_error(clGetDeviceIDs(
 				info->platform,
-			//	CL_DEVICE_TYPE_GPU,
-				CL_DEVICE_TYPE_CPU,
+				CL_DEVICE_TYPE_GPU,
+		//		CL_DEVICE_TYPE_CPU,
 				1, &info->device_id,
 				&info->num_devices));
 	status = CL_SUCCESS;

@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/21 13:07:51 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/21 18:25:04 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -66,7 +66,6 @@ void smooth(int *addr, int win_w, int win_h)
 		}
 		i++;
 	}
-	/*
 	i = 1;
 	while (i < win_w - 1)
 	{
@@ -90,7 +89,6 @@ void smooth(int *addr, int win_w, int win_h)
 		}
 		i++;
 	}
-	*/
 	i = 0;
 	new = addr;
 	while (i < win_w)
@@ -122,7 +120,7 @@ int main(void)
 	t_scene			scene;
 
     rt_cl_init(&info);
-    rt_cl_compile(&info, (char *)noc_file_dialog_open(NOC_FILE_DIALOG_OPEN, NULL, "."));
+    rt_cl_compile(&info, (char *)noc_file_dialog_open(0, NULL, "."));
 	size = rt_cl_create_kernel(&info, "t_hit_size");
 	primary = rt_cl_create_kernel(&info, "first_intersection");
 	extended = rt_cl_create_kernel(&info, "path_tracing");
@@ -172,10 +170,13 @@ int main(void)
 	{
 		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
 				break ;
-		for (int i = 0; i < 15; i++)
+		for (int i = 0; i < 20; i++)
 			rt_cl_push_task(&extended, &job_size);
 		rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
+		rt_cl_join(&info);
+		/*
 		smooth(pixels, width, height);
+		*/
 		SDL_UpdateTexture(canvas, NULL, pixels, width << 2);
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, canvas, NULL, NULL);

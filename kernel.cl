@@ -31,24 +31,25 @@ typedef struct			s_hit
 	float3				mask;
 	float3				color;
 	float3				color_accum;
+	unsigned long		samples;
 	constant t_object	*object;
 	uint				seeds[2];
 	unsigned char		iterations;
-	unsigned long		samples;
+	unsigned char		material;
 }						t_hit;
 
 #define NULL ((void *)0)
 
 
 static constant t_object	objs[] = {
+	{{0,0,0}, {1,1,1}, {1,1,1}, {0,35,55}, 21, 100, 0},
 	{{0,0,0}, {1,0,1}, {0,0,0}, {0,0,270}, 200, 4, 0},
 	{{0,0,0}, {0,1,1}, {0,0,0}, {215,0,55}, 200, 4, 0},
 	{{0,0,0}, {1,1,0}, {0,0,0}, {-215,0,55}, 200, 100, 0},
 	{{0,0,0}, {1,0,0}, {0,0,0}, {0,215,55}, 200, 4, 0},
 	{{0,0,0}, {1,1,1}, {0,0,0}, {0,-215,55}, 200, 100, 0},
-	{{0,0,0}, {1,0.2,0.7}, {0,0,0}, {-4,-10,55}, 3, 100, 0},
-	{{0,0,0}, {0.5,0,0.5}, {0,0,0}, {5,-10,55}, 3, 4, 0},
-	{{0,0,0}, {0,0,0}, {1,1,1}, {0,15,55}, 15, 100, 0}
+	{{0,0,0}, {1,0.2,0.7}, {0,0,0}, {-6,-10,65}, 3, 100, 0},
+	{{0,0,0}, {0,0,0}, {0,0,0}, {8,-5,55}, 8, 4, 0}
 };
 
 static constant t_camera 	camera = {
@@ -95,18 +96,10 @@ static void ft_roots(float2 *t, float a, float b, float c)
 	float	deskr;
 
 	deskr = b * b - 4 * a * c;
-	if (deskr >= 0 && a != 0)
+	if (deskr >= 0.f && a != 0.f)
 	{
-		if (deskr == 0)
-		{
-			t->x = -0.5 * b / a;
-			t->y = t->x;
-		}
-		else
-		{
-			t->x = half_divide(-b + half_sqrt(deskr), 2 * a);
-			t->y = half_divide(-b - half_sqrt(deskr), 2 * a);
-		}
+		t->x = half_divide(-b + half_sqrt(deskr), 2 * a);
+		t->y = half_divide(-b - half_sqrt(deskr), 2 * a);
 	}
 	else
 	{
@@ -138,7 +131,7 @@ static float  sphere_intersect(constant t_object *obj,
 
 static float3	normal(constant t_object *obj, float3 pos)
 {
-	return (fast_normalize(pos - obj->origin));
+	return (normalize(pos - obj->origin));
 }
 
 static void		intersect(	constant t_object *obj,
@@ -154,42 +147,41 @@ static void		intersect(	constant t_object *obj,
 	*closest = obj;
 }
 
-static float3	random_path(constant t_object *obj, t_hit *hit, float3 *magnitude)
+static float3	random_path(constant t_object *obj, t_hit *hit, float *magnitude)
 {
 	float u1 = get_random(&hit->seeds[0], &hit->seeds[1]);
-	float u1 = get_random(&hit->seeds[1], &hit->seeds[0]);
+	float u2 = get_random(&hit->seeds[0], &hit->seeds[1]);
 	const float phi = 2.f * M_PI * u2;
 	const float zz = 1.f - 2.f * u1;
+	const float r = half_sqrt(max(0.f, 1.f - zz * zz));
 	const float xx = r * half_cos(phi);
 	const float yy = r * half_sin(phi);
-	const float r = half_sqrt(max(0.f, 1.f - zz * zz));
-	float3 point = (float3)(xx. yy, zz) * obj->radius;
+	float3 point = (float3)(xx, yy, zz) * (obj->radius + 0.03f);
 
-	if (dot(point, obj->origin - hit->pos) < 0.0f)
-		point *= -1.0f;
-	point += obj->origin;
-	float3 dir = point - - hit->pos;
-	*magnitude = fast_length(dir);
+	if (dot(point, obj->origin - hit->pos) > 0.0f)
+		point = -point;
+	point = point + obj->origin;
+	float3 dir = point - hit->pos;
+	*magnitude = fast_length(dir) - 0.0003f;
 	return (dir / *magnitude);
 }
 
 static float3	find_direct(constant t_object *obj, constant t_object *objs, int objnum, t_hit *hit)
 {
 	constant t_object	*closest = NULL;
-	float				closest_dist = INFINITY;
 
+	if (fast_length(obj->emission) < 0.001)
+		return ((float3)(0,0,0));
+	float magnitude = 0;
+	float3 ray_dir = random_path(obj, hit, &magnitude);
 	for (int i = 0; i < objnum; i++)
 	{
-		if (&objs[i] == obj || fast_length(objs[i]->emission) < 0.001)
-			continue;
-		float3 magnitude = {0,0,0};
-		float3 ray_dir = random_path(&objs[i], hit, &magnitude);
-		
-		intersect(&objs[i], ray_dir, ray_orig, &closest, &closest_dist);
-		if (closest)
+		float	closest_dist = INFINITY;
+		intersect(&objs[i], ray_dir, hit->pos, &closest, &closest_dist);
+		if (closest_dist < magnitude)
 			return ((float3)(0,0,0));
 	}
-	return ((float3)(obj->emission * hit->mask));
+	return ((float3)(obj->emission));
 	
 }
 
@@ -205,17 +197,19 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, t_scene scene, t_hit *hit
 	hit->object = closest;
 	if (closest && closest_dist < INFINITY)
 	{
-		float3 direct = {0.f,0.f,0.f};
 		hit->pos = ray_orig + ray_dir * closest_dist;
 		hit->normal = normal(obj, ray_orig);
 		hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal :
 			hit->normal * (-1.0f);
-		hit->pos += hit->normal *  0.0003f;
-		for (int i = 0; i < objnum; i++)
-			direct += find_direct(&obj[i], obj, objnum, hit);
-		hit->color += hit->mask * (closest->emission + direct);
+		hit->pos = hit->pos + hit->normal * 0.00003f;
+		float3 direct = {0.f,0.f,0.f};
+		/*
+		for (int i = 0; i < objnum && fast_length(obj[i].color) > 0.01; i++)
+			direct = direct + find_direct(&obj[i], obj, objnum, hit);
+			*/
 		hit->mask *= closest->color;
-		hit->mask *= fabs(dot(ray_dir, hit->normal));
+		hit->color = hit->color + (hit->mask * (closest->emission + direct));
+		hit->mask *= -dot(ray_dir, hit->normal);
 	}
 }
 
@@ -225,10 +219,10 @@ static float3	construct_ray(uint2 coords, t_camera camera, t_hit *hit)
 	hit->mask = (float3)(1, 1, 1);
 	hit->iterations = 1;
 	hit->pos = camera.origin;
-	return (fast_normalize((float3)
+	return (normalize((float3)
 		((((coords.x + get_random(&hit->seeds[0], &hit->seeds[1])) / camera.canvas.x) * 2 - 1) * (camera.canvas.x / camera.canvas.y),
 		1 - 2 * ((coords.y + get_random(&hit->seeds[0], &hit->seeds[1])) / camera.canvas.y),
-		2.0) * 0.55f
+		2.0) * 0.5f
 	));
 }
 
@@ -259,10 +253,10 @@ void	path_tracing(	t_scene scene,
 	float3	ray_dir;
 	t_hit 	hit = hits[i];
 
-	if (__builtin_expect(hit.iterations > 4 || !hit.object || fast_length(hit.mask) < 0.01, 0))
+	if (__builtin_expect(hit.iterations > 256 || !hit.object || fast_length(hit.mask) < 0.01 || fast_length(hit.color) > 1.44224957031f, false))
 	{
-		hit.color_accum += min(hit.color, 1.0f);
-		if (fast_length(hit.color) > 0.1f)
+		hit.color_accum = hit.color_accum + min(hit.color, 1.0f);
+		if (length(hit.color) > 0.1f)
 			hit.samples++;
 		hit.color = half_divide(hit.color_accum, hit.samples) * 255;
 		image[i] = upsample(
@@ -270,28 +264,21 @@ void	path_tracing(	t_scene scene,
 					(unsigned char)(hit.color.x)),
 				upsample((unsigned char)(hit.color.y),
 					(unsigned char)(hit.color.z)));
-		/*
-		image[i] = upsample(
-				upsample((unsigned char)0,
-					(unsigned char)(255)),
-				upsample((unsigned char)(255),
-					(unsigned char)(255)));
-					*/
 		ray_dir = construct_ray(coords, camera, &hit);
 	}
 	else
 	{
 		float rand1 = 2.0f * M_PI * get_random(&hit.seeds[0], &hit.seeds[1]);
 		float rand2 = get_random(&hit.seeds[0], &hit.seeds[1]);
-		float rand2s = half_sqrt(rand2);
+		float rand2s = native_sqrt(rand2);
 		float3 w = hit.normal;
 		float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f)
 			: (float3)(1.0f, 0.0f, 0.0f);
 		float3 u = fast_normalize(cross(axis, w));
 		float3 v = cross(w, u);
-		ray_dir = fast_normalize(u * half_cos(rand1) * rand2s +
-				v * half_sin(rand1) * rand2s +
-				w * half_sqrt(1.0f - rand2));
+		ray_dir = normalize(u * half_cos(rand1) * rand2s +
+							v * half_sin(rand1) * rand2s +
+							w * half_sqrt(1.0f - rand2));
 	}
 	trace_ray(hit.pos, ray_dir, scene, &hit);
 	hit.iterations++;
