@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/21 18:26:50 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/22 13:11:40 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -121,7 +121,7 @@ int main(void)
 	t_scene			scene;
 
     rt_cl_init(&info);
-    rt_cl_compile(&info, (char *)noc_file_dialog_open(1, NULL, "."));
+    rt_cl_compile(&info, "kernel.cl");
 	size = rt_cl_create_kernel(&info, "t_hit_size");
 	primary = rt_cl_create_kernel(&info, "first_intersection");
 	extended = rt_cl_create_kernel(&info, "path_tracing");
