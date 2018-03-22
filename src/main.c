@@ -141,8 +141,6 @@ int main(void)
 	rt_cl_push_task(&extended, &job_size);
 	rt_cl_push_task(&extended, &job_size);
 	rt_cl_push_task(&extended, &job_size);
-	rt_cl_push_task(&smooth, &job_size);
-	rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
 
 	rt_cl_join(&info);
 
@@ -172,11 +170,13 @@ int main(void)
 	bzero(pixels, sizeof(pixels));
 	while (1)
 	{
-		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
+		if (SDL_PollEvent(&event) && (event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)))
 				break ;
 		for (int i = 0; i < 20; i++)
 			rt_cl_push_task(&extended, &job_size);
-		rt_cl_device_to_host(&info, buff, pixels, job_size * sizeof(int));
+
+	rt_cl_push_task(&smooth, &job_size);
+	rt_cl_device_to_host(&info, out, pixels, job_size * sizeof(int));
 		rt_cl_join(&info);
 		/*
 		smooth(pixels, width, height);
