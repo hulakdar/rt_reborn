@@ -1,55 +1,27 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   kernel.cl                                          :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2018/03/22 13:33:31 by skamoza           #+#    #+#             */
+/*   Updated: 2018/03/22 13:33:31 by skamoza          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
 
-typedef struct	s_object
-{
-	float3		material;
-	float3		color;
-	float3		emission;
-	float3		origin;
-	float		radius;
-	float		r2;
-	int			type;
-}				t_object;
-
-typedef struct	s_camera
-{
-	float3		origin;
-	float3		dir;
-	float3		viewport;
-	int2		canvas;
-}				t_camera;
-
-typedef struct	s_scene
-{
-	t_camera			camera;
-	constant t_object*	objects;
-	int					objects_num;
-}				t_scene;
-typedef struct			s_hit
-{
-	float3				pos;
-	float3				normal;
-	float3				mask;
-	float3				color;
-	float3				color_accum;
-	unsigned long		samples;
-	constant t_object	*object;
-	uint				seeds[2];
-	unsigned char		iterations;
-	unsigned char		material;
-}						t_hit;
-
-#define NULL ((void *)0)
-
+#define KERNEL_ONLY
+#include "kernel.h"
 
 static constant t_object	objs[] = {
-	{{0,0,0}, {1,1,1}, {1,1,1}, {0,35,55}, 21, 100, 0},
-	{{0,0,0}, {1,0,1}, {0,0,0}, {0,0,270}, 200, 4, 0},
-	{{0,0,0}, {0,1,1}, {0,0,0}, {215,0,55}, 200, 4, 0},
-	{{0,0,0}, {1,1,0}, {0,0,0}, {-215,0,55}, 200, 100, 0},
-	{{0,0,0}, {1,0,0}, {0,0,0}, {0,215,55}, 200, 4, 0},
-	{{0,0,0}, {1,1,1}, {0,0,0}, {0,-215,55}, 200, 100, 0},
-	{{0,0,0}, {1,0.2,0.7}, {0,0,0}, {-6,-10,65}, 3, 100, 0},
-	{{0,0,0}, {0,0,0}, {0,0,0}, {8,-5,55}, 8, 4, 0}
+	{{1,0,0}, {1,1,1}, 1, sphere, {.sphere = (t_sphere){{0,4,55}, 5, 100}}},
+	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{0,0,270}, 200, 4}}},
+	{{1,0,0}, {0,1,1}, 0, sphere, {.sphere = (t_sphere){{215,0,55}, 200, 4}}},
+	{{1,0,0}, {1,1,0}, 0, sphere, {.sphere = (t_sphere){{-215,0,55}, 200, 100}}},
+	{{1,0,0}, {1,0,0}, 0, sphere, {.sphere = (t_sphere){{0,215,55}, 200, 4}}},
+	{{1,0,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{0,-210,55}, 200, 100}}},
+	{{0,1,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{-6,-5,45}, 6, 100}}},
+	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{8,-5,55}, 7, 4}}}
 };
 
 static constant t_camera 	camera = {
@@ -97,18 +69,13 @@ static void ft_roots(float2 *t, float a, float b, float c)
 
 	deskr = b * b - 4 * a * c;
 	if (deskr >= 0.f && a != 0.f)
-	{
-		t->x = half_divide(-b + half_sqrt(deskr), 2 * a);
-		t->y = half_divide(-b - half_sqrt(deskr), 2 * a);
-	}
+		*t = (float2)(	native_divide(-b + native_sqrt(deskr), 2 * a),
+						native_divide(-b - native_sqrt(deskr), 2 * a));
 	else
-	{
-		t->x = -1;
-		t->y = -1;
-	}
+		*t = (float2)(-1, -1);
 }
 
-static float  sphere_intersect(constant t_object *obj,
+static float  sphere_intersect(constant t_sphere *obj,
 								float3 ray_dir,
 								float3 ray_origin)
 {
@@ -129,7 +96,7 @@ static float  sphere_intersect(constant t_object *obj,
 		return t.x < t.y ? t.x : t.y;
 }
 
-static float3	normal(constant t_object *obj, float3 pos)
+static float3	normal_sphere(constant t_sphere *obj, float3 pos)
 {
 	return (normalize(pos - obj->origin));
 }
@@ -140,29 +107,36 @@ static void		intersect(	constant t_object *obj,
 							constant t_object **closest,
 							float	*closest_dist)
 {
-	float current = sphere_intersect(obj, ray_dir, ray_orig);
-	if (current < 0.0 || current > *closest_dist)
+	float current;
+	switch (obj->type) {
+		case sphere:
+			current = sphere_intersect(&obj->spec.sphere, ray_dir, ray_orig);
+			break;
+		default:
+			break;
+	}
+	if (current <= 0.0 || current > *closest_dist)
 		return ;
 	*closest_dist = current;
 	*closest = obj;
 }
 
-static float3	random_path(constant t_object *obj, t_hit *hit, float *magnitude)
+static float3	random_path_sphere(constant t_sphere	*obj, t_hit *hit, float *magnitude)
 {
 	float u1 = get_random(&hit->seeds[0], &hit->seeds[1]);
 	float u2 = get_random(&hit->seeds[0], &hit->seeds[1]);
 	const float phi = 2.f * M_PI * u2;
 	const float zz = 1.f - 2.f * u1;
-	const float r = half_sqrt(max(0.f, 1.f - zz * zz));
-	const float xx = r * half_cos(phi);
-	const float yy = r * half_sin(phi);
+	const float r = sqrt(max(0.f, 1.f - zz * zz));
+	const float xx = r * cos(phi);
+	const float yy = r * sin(phi);
 	float3 point = (float3)(xx, yy, zz) * (obj->radius + 0.03f);
 
 	if (dot(point, obj->origin - hit->pos) > 0.0f)
 		point = -point;
 	point = point + obj->origin;
 	float3 dir = point - hit->pos;
-	*magnitude = fast_length(dir) - 0.0003f;
+	*magnitude = length(dir);
 	return (dir / *magnitude);
 }
 
@@ -170,13 +144,11 @@ static float3	find_direct(constant t_object *obj, constant t_object *objs, int o
 {
 	constant t_object	*closest = NULL;
 
-	if (fast_length(obj->emission) < 0.001)
-		return ((float3)(0,0,0));
 	float magnitude = 0;
-	float3 ray_dir = random_path(obj, hit, &magnitude);
+	float3 ray_dir = random_path_sphere(&obj->spec.sphere, hit, &magnitude);
 	for (int i = 0; i < objnum; i++)
 	{
-		float	closest_dist = INFINITY;
+		float	closest_dist = MAXFLOAT;
 		intersect(&objs[i], ray_dir, hit->pos, &closest, &closest_dist);
 		if (closest_dist < magnitude)
 			return ((float3)(0,0,0));
@@ -190,26 +162,36 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, t_scene scene, t_hit *hit
 	int					objnum = sizeof(objs) / sizeof(t_object);
 	constant t_object	*obj = &objs[0];
 	constant t_object	*closest = NULL;
-	float				closest_dist = INFINITY;
+	float				closest_dist = MAXFLOAT;
 
 	for (int i = 0; i < objnum; i++)
 		intersect(&obj[i], ray_dir, ray_orig, &closest, &closest_dist);
 	hit->object = closest;
-	if (closest && closest_dist < INFINITY)
+	if (closest && closest_dist < MAXFLOAT)
 	{
 		hit->pos = ray_orig + ray_dir * closest_dist;
-		hit->normal = normal(obj, ray_orig);
-		hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal :
-			hit->normal * (-1.0f);
-		hit->pos = hit->pos + hit->normal * 0.00003f;
-		float3 direct = {0.f,0.f,0.f};
-		/*
-		for (int i = 0; i < objnum && fast_length(obj[i].color) > 0.01; i++)
-			direct = direct + find_direct(&obj[i], obj, objnum, hit);
-			*/
+		hit->old_dir = ray_dir;
 		hit->mask *= closest->color;
-		hit->color = hit->color + (hit->mask * (closest->emission + direct));
+		hit->normal = normal_sphere(&obj->spec.sphere, ray_orig);
+		hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal :
+			-hit->normal;
+		hit->pos = hit->pos + hit->normal * 0.00003f;
+		if (closest->material.z > 0.0f)
+			hit->material = specular;
+		else if (closest->material.y > 0.0f)
+			hit->material = refraction;
+		else
+		{
+			hit->material = diffuse;
+			hit->color += hit->mask * (closest->emission);
+		}
 		hit->mask *= -dot(ray_dir, hit->normal);
+		/*
+		float3 direct = {0.f,0.f,0.f};
+		for (int i = 0; i < objnum && obj->emission > 0.01; i++)
+			direct += find_direct(&obj[i], obj, objnum, hit);
+		hit->color += direct * hit->mask;
+		*/
 	}
 }
 
@@ -233,8 +215,8 @@ void	first_intersection(	t_scene scene,
 	int		i = get_global_id(0);
 	uint2	coords = {i % camera.canvas.x, i / camera.canvas.x};
 	t_hit	hit;
-	hit.seeds[0] = coords.x * (uint)&coords + coords.y;
-	hit.seeds[1] = coords.y * (uint)&coords + coords.x;
+	hit.seeds[0] = mul24(coords.x, (uint)&coords) + coords.y;
+	hit.seeds[1] = mul24(coords.y, (uint)&coords) + coords.x;
 	float3	ray_dir = construct_ray(coords, camera, &hit);
 	
 	hit.color_accum = (float3)(0,0,0);
@@ -253,10 +235,10 @@ void	path_tracing(	t_scene scene,
 	float3	ray_dir;
 	t_hit 	hit = hits[i];
 
-	if (__builtin_expect(hit.iterations > 256 || !hit.object || fast_length(hit.mask) < 0.01 || fast_length(hit.color) > 1.44224957031f, false))
+	if (__builtin_expect(hit.iterations > 100 || !hit.object || fast_length(hit.mask) < 0.01 || fast_length(hit.color) > 1.44224957031f, false))
 	{
 		hit.color_accum = hit.color_accum + min(hit.color, 1.0f);
-		if (length(hit.color) > 0.1f)
+		if (fast_length(hit.color) > 0.1f)
 			hit.samples++;
 		hit.color = half_divide(hit.color_accum, hit.samples) * 255;
 		image[i] = upsample(
@@ -266,11 +248,15 @@ void	path_tracing(	t_scene scene,
 					(unsigned char)(hit.color.z)));
 		ray_dir = construct_ray(coords, camera, &hit);
 	}
+	else if (hit.material == refraction)
+		ray_dir = -hit.old_dir - 2.0f * dot(hit.normal, hit.old_dir) * hit.normal;
+	else if (hit.material == specular)
+		ray_dir = hit.old_dir - 2.0f * dot(hit.normal, hit.old_dir) * hit.normal;
 	else
 	{
 		float rand1 = 2.0f * M_PI * get_random(&hit.seeds[0], &hit.seeds[1]);
 		float rand2 = get_random(&hit.seeds[0], &hit.seeds[1]);
-		float rand2s = native_sqrt(rand2);
+		float rand2s = half_sqrt(rand2);
 		float3 w = hit.normal;
 		float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f)
 			: (float3)(1.0f, 0.0f, 0.0f);
@@ -285,42 +271,66 @@ void	path_tracing(	t_scene scene,
 	hits[i] = hit;
 }
 
-union    u_color
-{
-	 unsigned int color;
-	 unsigned char channels[4];
-};
 
 __kernel void	smooth(global int *arr, global int *out)
 {
 	int i;
 	int j;
 
-	int win_w = camera.canvas.x;
-	// int win_h = 1000;
-	union    u_color col[25];
-	int		g = get_global_id(0);
+union {
+	 unsigned int	color;
+	 unsigned char	channels[4];
+} 					col[7];
+	int 			win_w = camera.canvas.x;
+	int				g = get_global_id(0);
 
 	i = g / win_w;
 	j = g % win_w;
 	if (i > 0 && j > 0 && i < win_w && j < win_w)
 	{
-		col[0].color = arr[i * win_w + (j - 1)];
-		col[1].color = arr[i * win_w + j];
-		col[2].color = arr[i * win_w + j + 1];
-		col[3].color = arr[(i - 1) * win_w  + j];
-		col[5].color = arr[(i - 1) * win_w  + j - 1];
-		col[6].color = arr[(i - 1) * win_w  + j + 1];
-		col[4].color = arr[(i + 1) * win_w  + j];
-		col[7].color = arr[(i + 1) * win_w  + j - 1];
-		col[8].color = arr[(i + 1) * win_w  + j + 1];
-		col[1].channels[0] = (col[0].channels[0] + col[1].channels[0] + col[2].channels[0] + col[3].channels[0] + col[4].channels[0] + col[5].channels[0] + col[6].channels[0] + col[7].channels[0] + col[8].channels[0]) / 9;
-		col[1].channels[1] = (col[0].channels[1] + col[1].channels[1] + col[2].channels[1] + col[3].channels[1] + col[4].channels[1] + col[5].channels[1] + col[6].channels[1] + col[7].channels[1] + col[8].channels[1]) / 9;
-		col[1].channels[2] = (col[0].channels[2] + col[1].channels[2] + col[2].channels[2] + col[3].channels[2] + col[4].channels[2] + col[5].channels[2] + col[6].channels[2] + col[7].channels[2] + col[8].channels[2]) / 9;
-		out[i * win_w + j] = col[1].color;
+		col[0].color = arr[g - 1];
+		col[1].color = arr[g];
+		col[2].color = arr[g + 1];
+		col[3].color = arr[g - win_w];
+		col[5].color = arr[g - win_w - 1];
+		col[6].color = arr[g - win_w + 1];
+		col[4].color = arr[g + win_w];
+		col[7].color = arr[g + win_w + 1];
+		col[8].color = arr[g + win_w - 1];
+		col[1].channels[0] =(
+				col[0].channels[0] +
+				col[1].channels[0] +
+				col[2].channels[0] +
+				col[3].channels[0] +
+				col[4].channels[0] +
+				col[5].channels[0] +
+				col[6].channels[0] +
+				col[7].channels[0] +
+				col[8].channels[0]) / 9;
+		col[1].channels[1] =(
+				col[0].channels[1] +
+				col[1].channels[1] +
+				col[2].channels[1] +
+				col[3].channels[1] +
+				col[4].channels[1] +
+				col[5].channels[1] +
+				col[6].channels[1] +
+				col[7].channels[1] +
+				col[8].channels[1]) / 9;
+		col[1].channels[2] =(
+				col[0].channels[2] +
+				col[1].channels[2] +
+				col[2].channels[2] +
+				col[3].channels[2] +
+				col[4].channels[2] +
+				col[5].channels[2] +
+				col[6].channels[2] +
+				col[7].channels[2] +
+				col[8].channels[2]) / 9;
+		out[g] = col[1].color;
 	}
 	else
-		out[g] = arr[i * win_w + j];
+		out[g] = arr[g];
 }
 
 __kernel

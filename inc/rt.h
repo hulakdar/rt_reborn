@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/13 18:11:20 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/21 18:26:51 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/22 16:59:34 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,27 +17,12 @@
 # include "cl_wrap.h"
 # include "SDL.h"
 
-enum	e_obj_type
-{
-	sphere
-};
 enum {
     NOC_FILE_DIALOG_OPEN    = 1 << 0,   // Create an open file dialog.
     NOC_FILE_DIALOG_SAVE    = 1 << 1,   // Create a save file dialog.
     NOC_FILE_DIALOG_DIR     = 1 << 2,   // Open a directory.
     NOC_FILE_DIALOG_OVERWRITE_CONFIRMATION = 1 << 3,
 };
-
-typedef struct	s_object
-{
-	cl_double3	material;
-	cl_double3	color;
-	cl_double3	emission;
-	cl_double3	origin;
-	cl_double	radius;
-	cl_double	r2;
-	cl_int		type;
-}				t_object;
 
 typedef struct	s_camera
 {

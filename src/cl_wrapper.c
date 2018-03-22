@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/02 14:37:46 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/21 16:49:28 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/22 13:43:55 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -220,7 +220,7 @@ cl_int		rt_cl_compile(t_cl_info *info, char *path)
 				&status);
 		check_error(status);
 		status = clBuildProgram(info->program,
-				1, &info->device_id, NULL, NULL, NULL);
+				1, &info->device_id, "-I inc/", NULL, NULL);
 		if (status != 0) {
 			printf("status = %i\n", status);
 			// Determine the size of the log
