@@ -14,14 +14,15 @@
 #include "kernel.h"
 
 static constant t_object	objs[] = {
-	{{1,0,0}, {1,1,1}, 1, sphere, {.sphere = (t_sphere){{0,4,55}, 5, 100}}},
+	{{1,0,0}, {1,1,1}, 1, sphere, {.sphere = (t_sphere){{0,17,45}, 5, 100}}},
+	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{-8,-8,44}, 6, 100}}},
 	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{0,0,270}, 200, 4}}},
 	{{1,0,0}, {0,1,1}, 0, sphere, {.sphere = (t_sphere){{215,0,55}, 200, 4}}},
 	{{1,0,0}, {1,1,0}, 0, sphere, {.sphere = (t_sphere){{-215,0,55}, 200, 100}}},
 	{{1,0,0}, {1,0,0}, 0, sphere, {.sphere = (t_sphere){{0,215,55}, 200, 4}}},
 	{{1,0,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{0,-210,55}, 200, 100}}},
-	{{0,1,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{-6,-5,45}, 6, 100}}},
-	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{8,-5,55}, 7, 4}}}
+	{{0,1,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{7,-5,45}, 6, 100}}},
+	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{-8,0,55}, 7, 4}}}
 };
 
 static constant t_camera 	camera = {
@@ -96,7 +97,7 @@ static float  sphere_intersect(constant t_sphere *obj,
 		return t.x < t.y ? t.x : t.y;
 }
 
-static float3	normal_sphere(constant t_sphere *obj, float3 pos)
+static float3	sphere_normal(constant t_sphere *obj, float3 pos)
 {
 	return (normalize(pos - obj->origin));
 }
@@ -157,6 +158,17 @@ static float3	find_direct(constant t_object *obj, constant t_object *objs, int o
 	
 }
 
+static float3	find_normal(constant t_object *obj, float3 ray_orig)
+{
+	switch (obj->type) {
+		case sphere:
+			return (sphere_normal(&obj->spec.sphere, ray_orig));
+		default:
+			break;
+	}
+	return ((float3)(0,0,0));
+}
+
 static void	trace_ray(float3 ray_orig, float3 ray_dir, t_scene scene, t_hit *hit)
 {
 	int					objnum = sizeof(objs) / sizeof(t_object);
@@ -172,10 +184,7 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, t_scene scene, t_hit *hit
 		hit->pos = ray_orig + ray_dir * closest_dist;
 		hit->old_dir = ray_dir;
 		hit->mask *= closest->color;
-		hit->normal = normal_sphere(&obj->spec.sphere, ray_orig);
-		hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal :
-			-hit->normal;
-		hit->pos = hit->pos + hit->normal * 0.00003f;
+		hit->normal = find_normal(obj, ray_orig);
 		if (closest->material.z > 0.0f)
 			hit->material = specular;
 		else if (closest->material.y > 0.0f)
@@ -184,14 +193,14 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, t_scene scene, t_hit *hit
 		{
 			hit->material = diffuse;
 			hit->color += hit->mask * (closest->emission);
+			hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal : -hit->normal;
+			hit->mask *= -dot(ray_dir, hit->normal);
+			float3 direct = {0.f,0.f,0.f};
+			for (int i = 0; i < objnum && obj->emission > 0.00001; i++)
+				direct += find_direct(&obj[i], obj, objnum, hit);
+			hit->color += direct * hit->mask * 0.47f;
 		}
-		hit->mask *= -dot(ray_dir, hit->normal);
-		/*
-		float3 direct = {0.f,0.f,0.f};
-		for (int i = 0; i < objnum && obj->emission > 0.01; i++)
-			direct += find_direct(&obj[i], obj, objnum, hit);
-		hit->color += direct * hit->mask;
-		*/
+		hit->pos = hit->pos + hit->normal * 0.00003f;
 	}
 }
 
@@ -215,12 +224,12 @@ void	first_intersection(	t_scene scene,
 	int		i = get_global_id(0);
 	uint2	coords = {i % camera.canvas.x, i / camera.canvas.x};
 	t_hit	hit;
-	hit.seeds[0] = mul24(coords.x, (uint)&coords) + coords.y;
-	hit.seeds[1] = mul24(coords.y, (uint)&coords) + coords.x;
+	hit.seeds[0] = mad24(coords.x, (uint)&coords, coords.y);
+	hit.seeds[1] = mad24(coords.y, (uint)&coords, coords.x);
 	float3	ray_dir = construct_ray(coords, camera, &hit);
 	
 	hit.color_accum = (float3)(0,0,0);
-	hit.samples = 1;
+	hit.samples = 0;
 	trace_ray(camera.origin, ray_dir, scene, &hit);
 	hits[i] = hit;
 }
@@ -240,7 +249,10 @@ void	path_tracing(	t_scene scene,
 		hit.color_accum = hit.color_accum + min(hit.color, 1.0f);
 		if (fast_length(hit.color) > 0.1f)
 			hit.samples++;
-		hit.color = half_divide(hit.color_accum, hit.samples) * 255;
+		if (!hit.samples)
+			hit.color = hit.color_accum * 255;
+		else
+			hit.color = half_divide(hit.color_accum, hit.samples) * 255;
 		image[i] = upsample(
 				upsample((unsigned char)0,
 					(unsigned char)(hit.color.x)),
@@ -248,10 +260,40 @@ void	path_tracing(	t_scene scene,
 					(unsigned char)(hit.color.z)));
 		ray_dir = construct_ray(coords, camera, &hit);
 	}
-	else if (hit.material == refraction)
-		ray_dir = -hit.old_dir - 2.0f * dot(hit.normal, hit.old_dir) * hit.normal;
 	else if (hit.material == specular)
-		ray_dir = hit.old_dir - 2.0f * dot(hit.normal, hit.old_dir) * hit.normal;
+		ray_dir = hit.old_dir - (2.0f * dot(hit.normal, hit.old_dir)) * hit.normal;
+	else if (hit.material == refraction)
+	{
+		ray_dir = hit.old_dir - (2.0f * dot(hit.normal, hit.old_dir)) * hit.normal;
+		int	into = dot(hit.normal, hit.old_dir) > 0.0f ? 1 : -1;
+		float nc = 1.f;
+		float nt = 1.5f;
+		float nnt = into > 0.f ? nc / nt : nt / nc;
+		float ddn = dot(hit.old_dir, hit.normal * into);
+		float cos2t = 1.f - nnt * nnt * (1 - ddn * ddn);
+		if (cos2t > 0.0f)
+		{
+			float kk = into * (ddn * nnt + half_sqrt(cos2t));
+			float3 transDir = normalize(nnt * hit.old_dir - kk * hit.normal);
+			float a = nt - nc;
+			float b = nt + nc;
+			float R0 = a * a / (b * b);
+			float c = 1 - (into > 1 ? -ddn : dot(transDir, hit.normal));
+			float Re = R0 + (1 - R0) * c * c * c * c*c;
+			float Tr = 1.f - Re;
+			float P = .25f + .5f * Re;
+			float RP = Re / P;
+			float TP = Tr / (1.f - P);
+
+			if (get_random(&hit.seeds[0], &hit.seeds[1]) < P)
+				hit.mask *= RP;
+			else {
+				hit.mask *= TP;
+				ray_dir = transDir;
+			}
+
+		}
+	}
 	else
 	{
 		float rand1 = 2.0f * M_PI * get_random(&hit.seeds[0], &hit.seeds[1]);
@@ -277,60 +319,55 @@ __kernel void	smooth(global int *arr, global int *out)
 	int i;
 	int j;
 
-union {
-	 unsigned int	color;
-	 unsigned char	channels[4];
-} 					col[7];
+	union {
+		unsigned int	color;
+		unsigned char	channels[4];
+	} 					col[7];
 	int 			win_w = camera.canvas.x;
 	int				g = get_global_id(0);
 
 	i = g / win_w;
 	j = g % win_w;
-	if (i > 0 && j > 0 && i < win_w && j < win_w)
-	{
-		col[0].color = arr[g - 1];
-		col[1].color = arr[g];
-		col[2].color = arr[g + 1];
-		col[3].color = arr[g - win_w];
-		col[5].color = arr[g - win_w - 1];
-		col[6].color = arr[g - win_w + 1];
-		col[4].color = arr[g + win_w];
-		col[7].color = arr[g + win_w + 1];
-		col[8].color = arr[g + win_w - 1];
-		col[1].channels[0] =(
-				col[0].channels[0] +
-				col[1].channels[0] +
-				col[2].channels[0] +
-				col[3].channels[0] +
-				col[4].channels[0] +
-				col[5].channels[0] +
-				col[6].channels[0] +
-				col[7].channels[0] +
-				col[8].channels[0]) / 9;
-		col[1].channels[1] =(
-				col[0].channels[1] +
-				col[1].channels[1] +
-				col[2].channels[1] +
-				col[3].channels[1] +
-				col[4].channels[1] +
-				col[5].channels[1] +
-				col[6].channels[1] +
-				col[7].channels[1] +
-				col[8].channels[1]) / 9;
-		col[1].channels[2] =(
-				col[0].channels[2] +
-				col[1].channels[2] +
-				col[2].channels[2] +
-				col[3].channels[2] +
-				col[4].channels[2] +
-				col[5].channels[2] +
-				col[6].channels[2] +
-				col[7].channels[2] +
-				col[8].channels[2]) / 9;
-		out[g] = col[1].color;
-	}
-	else
-		out[g] = arr[g];
+	col[0].color = arr[g - 1];
+	col[1].color = arr[g];
+	col[2].color = arr[g + 1];
+	col[3].color = arr[g - win_w];
+	col[5].color = arr[g - win_w - 1];
+	col[6].color = arr[g - win_w + 1];
+	col[4].color = arr[g + win_w];
+	col[7].color = arr[g + win_w + 1];
+	col[8].color = arr[g + win_w - 1];
+	col[1].channels[0] = (
+			col[0].channels[0] +
+			col[1].channels[0] +
+			col[2].channels[0] +
+			col[3].channels[0] +
+			col[4].channels[0] +
+			col[5].channels[0] +
+			col[6].channels[0] +
+			col[7].channels[0] +
+			col[8].channels[0]) / 9;
+	col[1].channels[1] = (
+			col[0].channels[1] +
+			col[1].channels[1] +
+			col[2].channels[1] +
+			col[3].channels[1] +
+			col[4].channels[1] +
+			col[5].channels[1] +
+			col[6].channels[1] +
+			col[7].channels[1] +
+			col[8].channels[1]) / 9;
+	col[1].channels[2] = (
+			col[0].channels[2] +
+			col[1].channels[2] +
+			col[2].channels[2] +
+			col[3].channels[2] +
+			col[4].channels[2] +
+			col[5].channels[2] +
+			col[6].channels[2] +
+			col[7].channels[2] +
+			col[8].channels[2]) / 9;
+	out[g] = col[1].color;
 }
 
 __kernel
