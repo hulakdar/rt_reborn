@@ -13,6 +13,7 @@
 #ifndef CL_WRAP_H
 # define CL_WRAP_H
 # define MAX_SOURCE_SIZE (0x100000)
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 # ifdef __APPLE__
 #  include <OpenCL/opencl.h>
 # else

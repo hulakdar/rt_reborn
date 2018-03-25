@@ -15,7 +15,12 @@
 #ifndef RT_H
 # define RT_H
 # include "cl_wrap.h"
-# include "SDL.h"
+
+# ifdef __APPLE__
+#  include "SDL.h"
+# else
+# include <SDL2/SDL.h>
+#endif
 
 enum {
     NOC_FILE_DIALOG_OPEN    = 1 << 0,   // Create an open file dialog.

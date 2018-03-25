@@ -19,7 +19,11 @@
 
 typedef enum	e_obj_type
 {
-	sphere
+	sphere,
+	plane,
+	cilinder,
+	cone,
+	disk
 }				t_obj_type;
 typedef enum	e_material
 {
@@ -36,18 +40,41 @@ typedef struct	s_sphere
 typedef struct	s_plane
 {
 	float3		origin;
+	float3		normal;
 }				t_plane;
+
+typedef struct	s_cilinder
+{
+	float3		origin;
+	float3		normal;
+	float		radius;
+	float		r2;
+	float 		height;
+}				t_cilinder;
 
 typedef struct	s_cone
 {
 	float3		origin;
+	float3		normal;
+	float 		half_tangent;
+	float 		m1;
+	float 		m2;
 }				t_cone;
+
+typedef struct	s_disk
+{
+	float3		origin;
+	float3		normal;
+	float 		radius2;
+}				t_disk;
 
 typedef	union	u_specs
 {
 	t_plane		plane;
 	t_sphere	sphere;
+	t_cilinder	cilinder;
 	t_cone		cone;
+	t_disk		disk;
 }				t_specs;
 
 typedef struct	s_object
@@ -79,6 +106,7 @@ typedef struct			s_hit
 {
 	float3				pos;
 	float3				normal;
+	float 				m;
 	float3				old_dir;
 	float3				mask;
 	float3				color;

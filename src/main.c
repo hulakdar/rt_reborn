@@ -18,8 +18,8 @@ int main(void)
 	SDL_Window		*window;
 	SDL_Renderer	*renderer;
 	SDL_Texture		*canvas;
-	const int		width = 1000;
-	const int		height = 1000;
+	const int		width = 500;
+	const int		height = 500;
 	size_t			job_size = width * height;
 	cl_int			pixels[job_size];
 	t_cl_info		info;
@@ -36,16 +36,18 @@ int main(void)
 	extended = rt_cl_create_kernel(&info, "path_tracing");
 	smooth = rt_cl_create_kernel(&info, "smooth");
 
-	cl_mem	hits = rt_cl_malloc_read(&info, 256 * job_size);
+	cl_mem	hits = rt_cl_malloc_read(&info, 144 * job_size);
 	cl_mem	buff = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
 	cl_mem	out = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
-	clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
-	clSetKernelArg(primary.kernel, 1, sizeof(cl_mem), &hits);
-	clSetKernelArg(extended.kernel, 0, sizeof(t_scene), &scene);
-	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &hits);
-	clSetKernelArg(extended.kernel, 2, sizeof(cl_mem), &buff);
+	//cl_int ret = clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
+	//printf("%d\n", ret);
+	clSetKernelArg(primary.kernel, 0, sizeof(cl_mem), &hits);
+	//ret = clSetKernelArg(extended.kernel, 0, sizeof(t_scene), &scene);
+	clSetKernelArg(extended.kernel, 0, sizeof(cl_mem), &hits);
+	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &buff);
 	clSetKernelArg(smooth.kernel, 0, sizeof(cl_mem), &buff);
 	clSetKernelArg(smooth.kernel, 1, sizeof(cl_mem), &out);
+
 	rt_cl_push_task(&primary, &job_size);
 	rt_cl_push_task(&extended, &job_size);
 	rt_cl_push_task(&extended, &job_size);

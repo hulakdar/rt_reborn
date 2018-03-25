@@ -22,11 +22,15 @@ static constant t_object	objs[] = {
 	{{1,0,0}, {1,0,0}, 0, sphere, {.sphere = (t_sphere){{0,215,55}, 200, 4}}},
 	{{1,0,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{0,-210,55}, 200, 100}}},
 	{{0,1,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{7,-5,45}, 6, 100}}},
-	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{-8,0,55}, 7, 4}}}
+	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{-8,0,55}, 7, 4}}},
+	{{1,0,0}, {0,0,1}, 0, plane, {.plane = (t_plane){{8,0,55}, {-1, 1, -1}}}},
+	{{0,0,1}, {0,1,1}, 0, cilinder, {.cilinder = (t_cilinder){{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
+	{{0,0,1}, {0,1,1}, 0, cone, {.cone = (t_cone){{8,0,35}, {0,1,0}, 0.5, -7, 7}}},
+	{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}}
 };
 
 static constant t_camera 	camera = {
-	{0,0,0}, {0,0,1}, {1,1,1}, {1000, 1000}
+	{0,0,0}, {0,0,1}, {1,1,1}, {500, 500}
 };
 
 static float4	to_quaternion(float3 a)
@@ -102,16 +106,160 @@ static float3	sphere_normal(constant t_sphere *obj, float3 pos)
 	return (normalize(pos - obj->origin));
 }
 
+static float  plane_intersect(constant t_plane *obj,
+								float3 ray_dir,
+								float3 ray_origin)
+{
+	float	denom;
+	float3	oc;
+
+	if ((denom = dot(ray_dir, obj->normal)) == 0)
+		return (-1);
+	oc = ray_origin - obj->origin;
+	return (-dot(oc, obj->normal) / denom);
+}
+
+static float3	plane_normal(constant t_plane *obj)
+{
+	return (normalize(obj->normal));
+}
+
+static float  cilinder_intersect(constant t_cilinder *obj,
+								float3 ray_dir,
+								float3 ray_origin,
+								float *m)
+{
+	float	a;
+	float	b;
+	float	c;
+	float3	oc;
+	float2	t;
+
+	oc = ray_origin - obj->origin;
+	t.x = dot(ray_dir, normalize(obj->normal));
+	t.y = dot(oc, normalize(obj->normal));
+	a = dot(ray_dir, ray_dir) - t.x * t.x;
+	b = 2 * (dot(ray_dir, oc) - t.x * t.y);
+	c = dot(oc, oc) - t.y * t.y - obj->r2;
+	ft_roots(&t, a, b, c);
+	if ((t.x  < 0.0f) && (t.y < 0.0f))
+		return (-1);
+	if ((t.x  < 0.0f) || (t.y < 0.0f))
+	{
+		a = (t.x > t.y) ? t.x : t.y;
+		*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+		return ((*m <= obj->height) && (*m >= 0) ? t.x : -1);
+	}
+	a = (t.x < t.y) ? t.x : t.y;
+	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+	if ((*m <= obj->height) && (*m >= 0))
+		return (a);
+	a = (t.x >= t.y) ? t.x : t.y;
+	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+	if ((*m <= obj->height) && (*m >= 0))
+		return (a);
+	return (-1);
+}
+
+static float3	cilinder_normal(constant t_cilinder *obj, float3 pos, float m)
+{
+	return (normalize(pos - obj->origin - normalize(obj->normal) * m));
+}
+
+static float  cone_intersect(constant t_cone *obj,
+								float3 ray_dir,
+								float3 ray_origin,
+								float *m)
+{
+	float	a;
+	float	b;
+	float	c;
+	float 	d;
+	float3	oc;
+	float2	t;
+
+	oc = ray_origin - obj->origin;
+	t.x = dot(ray_dir, normalize(obj->normal));
+	t.y = dot(oc, normalize(obj->normal));
+	d = 1 + obj->half_tangent * obj->half_tangent;
+	a = dot(ray_dir, ray_dir) - d * t.x * t.x;
+	b = 2 * (dot(ray_dir, oc) - d * t.x * t.y);
+	c = dot(oc, oc) - d * t.y * t.y;
+	ft_roots(&t, a, b, c);
+	if ((t.x  < 0.0f) && (t.y < 0.0f))
+		return (-1);
+	if ((t.x  < 0.0f) || (t.y < 0.0f))
+	{
+		a = (t.x > t.y) ? t.x : t.y;
+		*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+		return ((*m <= obj->m2) && (*m >= obj->m1) ? t.x : -1);
+	}
+	a = (t.x < t.y) ? t.x : t.y;
+	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+	if ((*m <= obj->m2) && (*m >= obj->m1))
+		return (a);
+	a = (t.x >= t.y) ? t.x : t.y;
+	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+	if ((*m <= obj->m2) && (*m >= obj->m1))
+		return (a);
+	return (-1);
+}
+
+static float3	cone_normal(constant t_cone *obj, float3 pos, float m)
+{
+	return (normalize(pos - obj->origin - normalize(obj->normal) * m * (1 + obj->half_tangent * obj->half_tangent)));
+}
+
+static float  disk_intersect(constant t_disk *obj,
+								float3 ray_dir,
+								float3 ray_origin)
+{
+	float	denom;
+	float3	oc;
+	float	t;
+	float3 	pos;
+
+	if ((denom = dot(ray_dir, obj->normal)) == 0)
+		return (-1);
+	oc = ray_origin - obj->origin;
+	t = -dot(oc, obj->normal) / denom;
+	if (t < 0)
+		return (-1.0f);
+	pos = ray_origin + t * ray_dir;
+	pos -= obj->origin;
+	if (dot(pos, pos) <= obj->radius2)
+		return (t);
+	return (-1);
+}
+
+static float3	disk_normal(constant t_disk *obj)
+{
+	return (normalize(obj->normal));
+}
+
 static void		intersect(	constant t_object *obj,
 							float3 ray_dir,
 							float3 ray_orig,
 							constant t_object **closest,
-							float	*closest_dist)
+							float	*closest_dist,
+							float 	*m)
 {
 	float current;
 	switch (obj->type) {
 		case sphere:
 			current = sphere_intersect(&obj->spec.sphere, ray_dir, ray_orig);
+			break;
+		case plane:
+			current = plane_intersect(&obj->spec.plane, ray_dir, ray_orig);
+			break;
+		case cilinder:
+			current = cilinder_intersect(&obj->spec.cilinder, ray_dir, ray_orig, m);
+			break;
+		case cone:
+			current = cone_intersect(&obj->spec.cone, ray_dir, ray_orig, m);
+			break;
+		case disk:
+			current = disk_intersect(&obj->spec.disk, ray_dir, ray_orig);
 			break;
 		default:
 			break;
@@ -150,7 +298,7 @@ static float3	find_direct(constant t_object *obj, constant t_object *objs, int o
 	for (int i = 0; i < objnum; i++)
 	{
 		float	closest_dist = MAXFLOAT;
-		intersect(&objs[i], ray_dir, hit->pos, &closest, &closest_dist);
+		intersect(&objs[i], ray_dir, hit->pos, &closest, &closest_dist, &(hit->m));
 		if (closest_dist < magnitude)
 			return ((float3)(0,0,0));
 	}
@@ -158,18 +306,26 @@ static float3	find_direct(constant t_object *obj, constant t_object *objs, int o
 	
 }
 
-static float3	find_normal(constant t_object *obj, float3 ray_orig)
+static float3	find_normal(constant t_object *obj, float3 ray_orig, float m)
 {
 	switch (obj->type) {
 		case sphere:
 			return (sphere_normal(&obj->spec.sphere, ray_orig));
+		case plane:
+			return (plane_normal(&obj->spec.plane));
+		case cilinder:
+			return (cilinder_normal(&obj->spec.cilinder, ray_orig, m));
+		case cone:
+			return (cone_normal(&obj->spec.cone, ray_orig, m));
+		case disk:
+			return (disk_normal(&obj->spec.disk));
 		default:
 			break;
 	}
 	return ((float3)(0,0,0));
 }
 
-static void	trace_ray(float3 ray_orig, float3 ray_dir, t_scene scene, t_hit *hit)
+static void	trace_ray(float3 ray_orig, float3 ray_dir, /*t_scene scene,*/ t_hit *hit)
 {
 	int					objnum = sizeof(objs) / sizeof(t_object);
 	constant t_object	*obj = &objs[0];
@@ -177,14 +333,14 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, t_scene scene, t_hit *hit
 	float				closest_dist = MAXFLOAT;
 
 	for (int i = 0; i < objnum; i++)
-		intersect(&obj[i], ray_dir, ray_orig, &closest, &closest_dist);
+		intersect(&obj[i], ray_dir, ray_orig, &closest, &closest_dist, &(hit->m));
 	hit->object = closest;
 	if (closest && closest_dist < MAXFLOAT)
 	{
 		hit->pos = ray_orig + ray_dir * closest_dist;
 		hit->old_dir = ray_dir;
 		hit->mask *= closest->color;
-		hit->normal = find_normal(obj, ray_orig);
+		hit->normal = find_normal(obj, ray_orig, hit->m);
 		if (closest->material.z > 0.0f)
 			hit->material = specular;
 		else if (closest->material.y > 0.0f)
@@ -218,7 +374,7 @@ static float3	construct_ray(uint2 coords, t_camera camera, t_hit *hit)
 }
 
 __kernel __attribute__((vec_type_hint ( float3 )))
-void	first_intersection(	t_scene scene,
+void	first_intersection(	/*t_scene scene,*/
 							global t_hit *hits)
 {
 	int		i = get_global_id(0);
@@ -230,12 +386,12 @@ void	first_intersection(	t_scene scene,
 	
 	hit.color_accum = (float3)(0,0,0);
 	hit.samples = 0;
-	trace_ray(camera.origin, ray_dir, scene, &hit);
+	trace_ray(camera.origin, ray_dir, /*scene,*/ &hit);
 	hits[i] = hit;
 }
 
 __kernel __attribute__((vec_type_hint ( float3 )))
-void	path_tracing(	t_scene scene,
+void	path_tracing(	/*t_scene scene,*/
 						global t_hit *hits,
 						global int *image)
 {
@@ -308,7 +464,7 @@ void	path_tracing(	t_scene scene,
 							v * half_sin(rand1) * rand2s +
 							w * half_sqrt(1.0f - rand2));
 	}
-	trace_ray(hit.pos, ray_dir, scene, &hit);
+	trace_ray(hit.pos, ray_dir, /*scene,*/ &hit);
 	hit.iterations++;
 	hits[i] = hit;
 }
