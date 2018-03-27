@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/27 12:16:31 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/27 14:12:50 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,12 +41,11 @@ int main(void)
 	cl_mem	hits = rt_cl_malloc_read(&info, 144 * job_size);
 	cl_mem	buff = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
 	cl_mem	out = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
-	cl_int ret = clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
-	//printf("%d\n", ret);
-	clSetKernelArg(primary.kernel, 0, sizeof(cl_mem), &hits);
-	ret = clSetKernelArg(extended.kernel, 0, sizeof(t_scene), &scene);
-	clSetKernelArg(extended.kernel, 0, sizeof(cl_mem), &hits);
-	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &buff);
+	clSetKernelArg(primary.kernel, 0, sizeof(cl_mem), &scene);
+	clSetKernelArg(primary.kernel, 1, sizeof(cl_mem), &hits);
+	clSetKernelArg(extended.kernel, 0, sizeof(t_scene), &scene);
+	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &hits);
+	clSetKernelArg(extended.kernel, 2, sizeof(cl_mem), &buff);
 	clSetKernelArg(draw.kernel, 0, sizeof(cl_mem), &hits);
 	clSetKernelArg(draw.kernel, 1, sizeof(cl_mem), &buff);
 	clSetKernelArg(smooth.kernel, 0, sizeof(cl_mem), &buff);

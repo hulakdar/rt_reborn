@@ -313,7 +313,7 @@ static float3	find_normal(constant t_object *obj, float3 ray_orig, float m)
 	return ((float3)(0,0,0));
 }
 
-static void	trace_ray(float3 ray_orig, float3 ray_dir, /*t_scene scene,*/ t_hit *hit)
+static void	trace_ray(float3 ray_orig, float3 ray_dir, t_scene scene, t_hit *hit)
 {
 	int					objnum = sizeof(objs) / sizeof(t_object);
 	constant t_object	*obj = &objs[0];
@@ -362,7 +362,7 @@ static float3	construct_ray(uint2 coords, t_camera camera, t_hit *hit)
 }
 
 __kernel __attribute__((vec_type_hint ( float3 )))
-void	first_intersection(	/*t_scene scene,*/
+void	first_intersection(	t_scene scene,
 							global t_hit *hits)
 {
 	int		i = get_global_id(0);
@@ -374,12 +374,12 @@ void	first_intersection(	/*t_scene scene,*/
 	
 	hit.color_accum = (float3)(0,0,0);
 	hit.samples = 0;
-	trace_ray(camera.origin, ray_dir, /*scene,*/ &hit);
+	trace_ray(camera.origin, ray_dir, scene, &hit);
 	hits[i] = hit;
 }
 
 __kernel __attribute__((vec_type_hint ( float3 )))
-void	path_tracing(	/*t_scene scene,*/
+void	path_tracing(	t_scene scene,
 						global t_hit *hits,
 						global int *image)
 {
@@ -388,7 +388,9 @@ void	path_tracing(	/*t_scene scene,*/
 	float3	ray_dir;
 	t_hit 	hit = hits[i];
 
-	if (__builtin_expect(hit.iterations > 240 || !hit.object || fast_length(hit.mask) < 0.01 || fast_length(hit.color) > 1.44224957031f, true))
+	if (__builtin_expect(hit.iterations > 100 || !hit.object ||
+		fast_length(hit.mask) < 0.001 ||
+		fast_length(hit.color) >= 1.44224957031f, false))
 	{
 		hit.color_accum = hit.color_accum + min(hit.color, 1.0f);
 		if (fast_length(hit.color) > 0.1f)
@@ -427,7 +429,6 @@ void	path_tracing(	/*t_scene scene,*/
 				hit.mask *= TP;
 				ray_dir = transDir;
 			}
-
 		}
 	}
 	*/
@@ -439,13 +440,13 @@ void	path_tracing(	/*t_scene scene,*/
 		float3 w = hit.normal;
 		float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f)
 			: (float3)(1.0f, 0.0f, 0.0f);
-		float3 u = normalize(cross(axis, w));
+		float3 u = fast_normalize(cross(axis, w));
 		float3 v = cross(w, u);
 		ray_dir = normalize(u * half_cos(rand1) * rand2s +
 							v * half_sin(rand1) * rand2s +
 							w * half_sqrt(1.0f - rand2));
 	}
-	trace_ray(hit.pos, ray_dir, /*scene,*/ &hit);
+	trace_ray(hit.pos, ray_dir, scene, &hit);
 	hit.iterations++;
 	hits[i] = hit;
 }
