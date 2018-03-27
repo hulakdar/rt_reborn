@@ -105,8 +105,8 @@ void		rt_cl_init(t_cl_info *info)
 				&info->num_platforms));
 	check_error(clGetDeviceIDs(
 				info->platform,
-				CL_DEVICE_TYPE_GPU,
-		//		CL_DEVICE_TYPE_CPU,
+		//		CL_DEVICE_TYPE_GPU,
+				CL_DEVICE_TYPE_CPU,
 				1, &info->device_id,
 				&info->num_devices));
 	status = CL_SUCCESS;
