@@ -24,7 +24,7 @@ static constant t_object	objs[] = {
 	{{0,1,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{7,-5,45}, 6, 100}}},
 	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{-8,0,55}, 7, 4}}},
 	{{1,0,0}, {0,0,1}, 0, plane, {.plane = (t_plane){{8,0,55}, {-1, 1, -1}}}},
-	{{0,0,1}, {0,1,1}, 0, cilinder, {.cilinder = (t_cilinder){{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
+	{{0,0,1}, {0,1,1}, 0, cylinder, {.cylinder = (t_cylinder){{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
 	{{0,0,1}, {0,1,1}, 0, cone, {.cone = (t_cone){{8,0,35}, {0,1,0}, 0.5, -7, 7}}},
 	{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}}
 };
@@ -124,7 +124,7 @@ static float3	plane_normal(constant t_plane *obj)
 	return (normalize(obj->normal));
 }
 
-static float  cilinder_intersect(constant t_cilinder *obj,
+static float  cylinder_intersect(constant t_cylinder *obj,
 								float3 ray_dir,
 								float3 ray_origin,
 								float *m)
@@ -147,23 +147,23 @@ static float  cilinder_intersect(constant t_cilinder *obj,
 	if ((t.x  < 0.0f) || (t.y < 0.0f))
 	{
 		a = (t.x > t.y) ? t.x : t.y;
-		*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+		*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
 		return ((*m <= obj->height) && (*m >= 0) ? t.x : -1);
 	}
 	a = (t.x < t.y) ? t.x : t.y;
-	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
 	if ((*m <= obj->height) && (*m >= 0))
 		return (a);
 	a = (t.x >= t.y) ? t.x : t.y;
-	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
 	if ((*m <= obj->height) && (*m >= 0))
 		return (a);
 	return (-1);
 }
 
-static float3	cilinder_normal(constant t_cilinder *obj, float3 pos, float m)
+static float3	cylinder_normal(constant t_cylinder *obj, float3 pos, float m)
 {
-	return (normalize(pos - obj->origin - normalize(obj->normal) * m));
+	return (normalize(pos - obj->origin - fast_normalize(obj->normal) * m));
 }
 
 static float  cone_intersect(constant t_cone *obj,
@@ -191,15 +191,15 @@ static float  cone_intersect(constant t_cone *obj,
 	if ((t.x  < 0.0f) || (t.y < 0.0f))
 	{
 		a = (t.x > t.y) ? t.x : t.y;
-		*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+		*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
 		return ((*m <= obj->m2) && (*m >= obj->m1) ? t.x : -1);
 	}
 	a = (t.x < t.y) ? t.x : t.y;
-	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
 	if ((*m <= obj->m2) && (*m >= obj->m1))
 		return (a);
 	a = (t.x >= t.y) ? t.x : t.y;
-	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, normalize(obj->normal));
+	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
 	if ((*m <= obj->m2) && (*m >= obj->m1))
 		return (a);
 	return (-1);
@@ -252,8 +252,8 @@ static void		intersect(	constant t_object *obj,
 		case plane:
 			current = plane_intersect(&obj->spec.plane, ray_dir, ray_orig);
 			break;
-		case cilinder:
-			current = cilinder_intersect(&obj->spec.cilinder, ray_dir, ray_orig, m);
+		case cylinder:
+			current = cylinder_intersect(&obj->spec.cylinder, ray_dir, ray_orig, m);
 			break;
 		case cone:
 			current = cone_intersect(&obj->spec.cone, ray_dir, ray_orig, m);
@@ -313,8 +313,8 @@ static float3	find_normal(constant t_object *obj, float3 ray_orig, float m)
 			return (sphere_normal(&obj->spec.sphere, ray_orig));
 		case plane:
 			return (plane_normal(&obj->spec.plane));
-		case cilinder:
-			return (cilinder_normal(&obj->spec.cilinder, ray_orig, m));
+		case cylinder:
+			return (cylinder_normal(&obj->spec.cylinder, ray_orig, m));
 		case cone:
 			return (cone_normal(&obj->spec.cone, ray_orig, m));
 		case disk:
@@ -482,10 +482,10 @@ __kernel void	smooth(global int *arr, global int *out)
 	int 			win_w = camera.canvas.x;
 	int				g = get_global_id(0);
 
-	i = g / win_w;
-	j = g % win_w;
-	col[0].color = arr[g - 1];
 	col[1].color = arr[g];
+	/*
+	i = g / win_w;
+	col[0].color = arr[g - 1];
 	col[2].color = arr[g + 1];
 	col[3].color = arr[g - win_w];
 	col[5].color = arr[g - win_w - 1];
@@ -523,6 +523,7 @@ __kernel void	smooth(global int *arr, global int *out)
 			col[6].channels[2] +
 			col[7].channels[2] +
 			col[8].channels[2]) / 9;
+	*/
 	out[g] = col[1].color;
 }
 
