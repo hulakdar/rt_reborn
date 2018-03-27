@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/22 13:31:55 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/22 19:19:45 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/27 11:53:56 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,7 @@ typedef enum	e_obj_type
 {
 	sphere,
 	plane,
-	cilinder,
+	cylinder,
 	cone,
 	disk
 }				t_obj_type;
@@ -43,14 +43,14 @@ typedef struct	s_plane
 	float3		normal;
 }				t_plane;
 
-typedef struct	s_cilinder
+typedef struct	s_cylinder
 {
 	float3		origin;
 	float3		normal;
 	float		radius;
 	float		r2;
 	float 		height;
-}				t_cilinder;
+}				t_cylinder;
 
 typedef struct	s_cone
 {
@@ -72,7 +72,7 @@ typedef	union	u_specs
 {
 	t_plane		plane;
 	t_sphere	sphere;
-	t_cilinder	cilinder;
+	t_cylinder	cylinder;
 	t_cone		cone;
 	t_disk		disk;
 }				t_specs;
