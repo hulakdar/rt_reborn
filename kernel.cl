@@ -14,19 +14,19 @@
 #include "kernel.h"
 
 static constant t_object	objs[] = {
-	{{1,0,0}, {1,1,1}, 1, sphere, {.sphere = (t_sphere){{0,17,45}, 5, 100}}},
-	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{-8,-8,44}, 6, 100}}},
-	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{0,0,270}, 200, 4}}},
-	{{1,0,0}, {0,1,1}, 0, sphere, {.sphere = (t_sphere){{215,0,55}, 200, 4}}},
-	{{1,0,0}, {1,1,0}, 0, sphere, {.sphere = (t_sphere){{-215,0,55}, 200, 100}}},
-	{{1,0,0}, {1,0,0}, 0, sphere, {.sphere = (t_sphere){{0,215,55}, 200, 4}}},
-	{{1,0,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{0,-210,55}, 200, 100}}},
-	{{0,1,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{7,-5,45}, 6, 100}}},
-	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{-8,0,55}, 7, 4}}},
-	{{1,0,0}, {0,0,1}, 0, plane, {.plane = (t_plane){{8,0,55}, {-1, 1, -1}}}},
-	{{0,0,1}, {0,1,1}, 0, cylinder, {.cylinder = (t_cylinder){{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
-	{{0,0,1}, {0,1,1}, 0, cone, {.cone = (t_cone){{8,0,35}, {0,1,0}, 0.5, -7, 7}}},
-	{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}}
+	{{1,0,0}, {1,1,1}, 1, sphere, {.sphere = {{0,17,45}, 5, 100}}},
+	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = {{-8,-8,44}, 6, 100}}},
+	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = {{0,0,270}, 200, 4}}},
+	{{1,0,0}, {0,1,1}, 0, sphere, {.sphere = {{215,0,55}, 200, 4}}},
+	{{1,0,0}, {1,1,0}, 0, sphere, {.sphere = {{-215,0,55}, 200, 100}}},
+	{{1,0,0}, {1,0,0}, 0, sphere, {.sphere = {{0,215,55}, 200, 4}}},
+	{{1,0,0}, {1,1,1}, 0, sphere, {.sphere = {{0,-210,55}, 200, 100}}},
+	{{0,1,0}, {1,1,1}, 0, sphere, {.sphere = {{7,-5,45}, 6, 100}}},
+	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = {{-8,0,55}, 7, 4}}},
+	{{1,0,0}, {1,1,1}, 0, plane, {.plane = {{8,0,55}, {-1, 1, -1}}}},
+	{{0,0,1}, {1,1,1}, 0, cylinder, {.cylinder = {{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
+	{{0,0,1}, {1,1,1}, 0, cone, {.cone = {{8,0,35}, {0,1,0}, 0.5, -7, 7}}},
+	{{0,0,1}, {1,1,1}, 0, disk, {.disk = {{0,0,25}, {1, 1, 1}, 9}}}
 };
 
 static constant t_camera 	camera = {
@@ -111,11 +111,10 @@ static float  plane_intersect(constant t_plane *obj,
 								float3 ray_origin)
 {
 	float	denom;
-	float3	oc;
 
 	if ((denom = dot(ray_dir, obj->normal)) == 0)
 		return (-1);
-	oc = ray_origin - obj->origin;
+	float3	oc = ray_origin - obj->origin;
 	return (-dot(oc, obj->normal) / denom);
 }
 
@@ -129,33 +128,29 @@ static float  cylinder_intersect(constant t_cylinder *obj,
 								float3 ray_origin,
 								float *m)
 {
-	float	a;
-	float	b;
-	float	c;
-	float3	oc;
-	float2	t;
+	float3	oc = ray_origin - obj->origin;
+	float3	normal = fast_normalize(obj->normal);
+	float2	z = { dot(ray_dir, normal), dot(oc, normal) };
+	float	a = dot(ray_dir, ray_dir) - z.x * z.x;
+	float	b = 2 * (dot(ray_dir, oc) - z.x * z.y);
+	float	c = dot(oc, oc) - z.y * z.y - obj->r2;
 
-	oc = ray_origin - obj->origin;
-	t.x = dot(ray_dir, normalize(obj->normal));
-	t.y = dot(oc, normalize(obj->normal));
-	a = dot(ray_dir, ray_dir) - t.x * t.x;
-	b = 2 * (dot(ray_dir, oc) - t.x * t.y);
-	c = dot(oc, oc) - t.y * t.y - obj->r2;
+	float2	t;
 	ft_roots(&t, a, b, c);
 	if ((t.x  < 0.0f) && (t.y < 0.0f))
 		return (-1);
 	if ((t.x  < 0.0f) || (t.y < 0.0f))
 	{
 		a = (t.x > t.y) ? t.x : t.y;
-		*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
+		*m  = z.x * a + z.y;
 		return ((*m <= obj->height) && (*m >= 0) ? t.x : -1);
 	}
 	a = (t.x < t.y) ? t.x : t.y;
-	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
+	*m  = z.x * a + z.y;
 	if ((*m <= obj->height) && (*m >= 0))
 		return (a);
 	a = (t.x >= t.y) ? t.x : t.y;
-	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
+	*m  = z.x * a + z.y;
 	if ((*m <= obj->height) && (*m >= 0))
 		return (a);
 	return (-1);
@@ -171,35 +166,30 @@ static float  cone_intersect(constant t_cone *obj,
 								float3 ray_origin,
 								float *m)
 {
-	float	a;
-	float	b;
-	float	c;
-	float 	d;
-	float3	oc;
-	float2	t;
+	float3	oc = ray_origin - obj->origin;
+	float3	normal = fast_normalize(obj->normal);
+	float2	z = { dot(ray_dir, normal), dot(oc, normal) };
+	float 	d = 1 + obj->half_tangent * obj->half_tangent;
+	float	a = dot(ray_dir, ray_dir) - d * z.x * z.x;
+	float	b = 2 * (dot(ray_dir, oc) - d * z.x * z.y);
+	float	c = dot(oc, oc) - d * z.y * z.y;
 
-	oc = ray_origin - obj->origin;
-	t.x = dot(ray_dir, normalize(obj->normal));
-	t.y = dot(oc, normalize(obj->normal));
-	d = 1 + obj->half_tangent * obj->half_tangent;
-	a = dot(ray_dir, ray_dir) - d * t.x * t.x;
-	b = 2 * (dot(ray_dir, oc) - d * t.x * t.y);
-	c = dot(oc, oc) - d * t.y * t.y;
+	float2	t;
 	ft_roots(&t, a, b, c);
 	if ((t.x  < 0.0f) && (t.y < 0.0f))
 		return (-1);
 	if ((t.x  < 0.0f) || (t.y < 0.0f))
 	{
 		a = (t.x > t.y) ? t.x : t.y;
-		*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
+		*m  = z.x * a + z.y;
 		return ((*m <= obj->m2) && (*m >= obj->m1) ? t.x : -1);
 	}
 	a = (t.x < t.y) ? t.x : t.y;
-	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
+	*m  = z.x * a + z.y;
 	if ((*m <= obj->m2) && (*m >= obj->m1))
 		return (a);
 	a = (t.x >= t.y) ? t.x : t.y;
-	*m  = dot(ray_dir, normalize(obj->normal)) * a + dot(oc, fast_normalize(obj->normal));
+	*m  = z.x * a + z.y;
 	if ((*m <= obj->m2) && (*m >= obj->m1))
 		return (a);
 	return (-1);
@@ -207,7 +197,7 @@ static float  cone_intersect(constant t_cone *obj,
 
 static float3	cone_normal(constant t_cone *obj, float3 pos, float m)
 {
-	return (normalize(pos - obj->origin - normalize(obj->normal) * m * (1 + obj->half_tangent * obj->half_tangent)));
+	return (normalize(pos - obj->origin - fast_normalize(obj->normal) * m * (1 + obj->half_tangent * obj->half_tangent)));
 }
 
 static float  disk_intersect(constant t_disk *obj,
@@ -222,11 +212,10 @@ static float  disk_intersect(constant t_disk *obj,
 	if ((denom = dot(ray_dir, obj->normal)) == 0)
 		return (-1);
 	oc = ray_origin - obj->origin;
-	t = -dot(oc, obj->normal) / denom;
+	t = half_divide(-dot(oc, obj->normal), denom);
 	if (t < 0)
 		return (-1.0f);
-	pos = ray_origin + t * ray_dir;
-	pos -= obj->origin;
+	pos = (ray_origin + t * ray_dir) - obj->origin;
 	if (dot(pos, pos) <= obj->radius2)
 		return (t);
 	return (-1);
@@ -276,16 +265,16 @@ static float3	random_path_sphere(constant t_sphere	*obj, t_hit *hit, float *magn
 	float u2 = get_random(&hit->seeds[0], &hit->seeds[1]);
 	const float phi = 2.f * M_PI * u2;
 	const float zz = 1.f - 2.f * u1;
-	const float r = sqrt(max(0.f, 1.f - zz * zz));
-	const float xx = r * cos(phi);
-	const float yy = r * sin(phi);
+	const float r = half_sqrt(max(0.f, 1.f - zz * zz));
+	const float xx = r * half_cos(phi);
+	const float yy = r * half_sin(phi);
 	float3 point = (float3)(xx, yy, zz) * (obj->radius + 0.03f);
 
 	if (dot(point, obj->origin - hit->pos) > 0.0f)
 		point = -point;
 	point = point + obj->origin;
 	float3 dir = point - hit->pos;
-	*magnitude = length(dir);
+	*magnitude = fast_length(dir);
 	return (dir / *magnitude);
 }
 
@@ -303,7 +292,6 @@ static float3	find_direct(constant t_object *obj, constant t_object *objs, int o
 			return ((float3)(0,0,0));
 	}
 	return ((float3)(obj->emission));
-	
 }
 
 static float3	find_normal(constant t_object *obj, float3 ray_orig, float m)
@@ -339,8 +327,12 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, /*t_scene scene,*/ t_hit 
 	{
 		hit->pos = ray_orig + ray_dir * closest_dist;
 		hit->old_dir = ray_dir;
-		hit->mask *= closest->color;
 		hit->normal = find_normal(obj, ray_orig, hit->m);
+		hit->mask *= closest->color;
+		hit->color += hit->mask * (closest->emission);
+		hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal : -hit->normal;
+		hit->mask *= -dot(ray_dir, hit->normal);
+		hit->pos = hit->pos + hit->normal * 0.00003f;
 		if (closest->material.z > 0.0f)
 			hit->material = specular;
 		else if (closest->material.y > 0.0f)
@@ -348,15 +340,11 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, /*t_scene scene,*/ t_hit 
 		else
 		{
 			hit->material = diffuse;
-			hit->color += hit->mask * (closest->emission);
-			hit->normal = dot(hit->normal, ray_dir) < 0.0f ? hit->normal : -hit->normal;
-			hit->mask *= -dot(ray_dir, hit->normal);
 			float3 direct = {0.f,0.f,0.f};
 			for (int i = 0; i < objnum && obj->emission > 0.00001; i++)
 				direct += find_direct(&obj[i], obj, objnum, hit);
 			hit->color += direct * hit->mask * 0.47f;
 		}
-		hit->pos = hit->pos + hit->normal * 0.00003f;
 	}
 }
 
@@ -400,24 +388,16 @@ void	path_tracing(	/*t_scene scene,*/
 	float3	ray_dir;
 	t_hit 	hit = hits[i];
 
-	if (__builtin_expect(hit.iterations > 100 || !hit.object || fast_length(hit.mask) < 0.01 || fast_length(hit.color) > 1.44224957031f, false))
+	if (__builtin_expect(hit.iterations > 240 || !hit.object || fast_length(hit.mask) < 0.01 || fast_length(hit.color) > 1.44224957031f, true))
 	{
 		hit.color_accum = hit.color_accum + min(hit.color, 1.0f);
 		if (fast_length(hit.color) > 0.1f)
 			hit.samples++;
-		if (!hit.samples)
-			hit.color = hit.color_accum * 255;
-		else
-			hit.color = half_divide(hit.color_accum, hit.samples) * 255;
-		image[i] = upsample(
-				upsample((unsigned char)0,
-					(unsigned char)(hit.color.x)),
-				upsample((unsigned char)(hit.color.y),
-					(unsigned char)(hit.color.z)));
 		ray_dir = construct_ray(coords, camera, &hit);
 	}
 	else if (hit.material == specular)
 		ray_dir = hit.old_dir - (2.0f * dot(hit.normal, hit.old_dir)) * hit.normal;
+	/*
 	else if (hit.material == refraction)
 	{
 		ray_dir = hit.old_dir - (2.0f * dot(hit.normal, hit.old_dir)) * hit.normal;
@@ -450,6 +430,7 @@ void	path_tracing(	/*t_scene scene,*/
 
 		}
 	}
+	*/
 	else
 	{
 		float rand1 = 2.0f * M_PI * get_random(&hit.seeds[0], &hit.seeds[1]);
@@ -458,7 +439,7 @@ void	path_tracing(	/*t_scene scene,*/
 		float3 w = hit.normal;
 		float3 axis = fabs(w.x) > 0.1f ? (float3)(0.0f, 1.0f, 0.0f)
 			: (float3)(1.0f, 0.0f, 0.0f);
-		float3 u = fast_normalize(cross(axis, w));
+		float3 u = normalize(cross(axis, w));
 		float3 v = cross(w, u);
 		ray_dir = normalize(u * half_cos(rand1) * rand2s +
 							v * half_sin(rand1) * rand2s +
@@ -469,6 +450,21 @@ void	path_tracing(	/*t_scene scene,*/
 	hits[i] = hit;
 }
 
+__kernel void	draw(global t_hit *hits, global int *image)
+{
+	int i = get_global_id(0);
+	t_hit hit = hits[i];
+
+	if (!hit.samples)
+		hit.color = hit.color_accum * 255;
+	else
+		hit.color = half_divide(hit.color_accum, hit.samples) * 255;
+	image[i] = upsample(
+			upsample((unsigned char)0,
+				(unsigned char)(hit.color.x)),
+			upsample((unsigned char)(hit.color.y),
+				(unsigned char)(hit.color.z)));
+}
 
 __kernel void	smooth(global int *arr, global int *out)
 {
@@ -480,13 +476,18 @@ __kernel void	smooth(global int *arr, global int *out)
 		unsigned char	channels[4];
 	} 					col[7];
 	int 			win_w = camera.canvas.x;
-	int				g = get_global_id(0);
+	size_t				g = get_global_id(0);
 
 	col[1].color = arr[g];
-	/*
 	i = g / win_w;
-	col[0].color = arr[g - 1];
-	col[2].color = arr[g + 1];
+	if (g)
+		col[0].color = arr[g - 1];
+	else
+		col[0].color = arr[g];
+	if (g < get_global_size(0))
+		col[2].color = arr[g + 1];
+	else
+		col[0].color = arr[g];
 	col[3].color = arr[g - win_w];
 	col[5].color = arr[g - win_w - 1];
 	col[6].color = arr[g - win_w + 1];
@@ -523,7 +524,6 @@ __kernel void	smooth(global int *arr, global int *out)
 			col[6].channels[2] +
 			col[7].channels[2] +
 			col[8].channels[2]) / 9;
-	*/
 	out[g] = col[1].color;
 }
 

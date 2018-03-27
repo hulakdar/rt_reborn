@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/22 13:31:55 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/27 11:53:56 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/27 12:19:51 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,10 @@
 
 # ifndef NULL
 #  define NULL ((void *)0)
+# endif
+
+# ifndef KERNEL_ONLY
+typedef cl_float3 float3
 # endif
 
 typedef enum	e_obj_type
@@ -27,7 +31,9 @@ typedef enum	e_obj_type
 }				t_obj_type;
 typedef enum	e_material
 {
-	diffuse, specular, refraction
+	diffuse,
+	specular,
+	refraction
 }				t_material;
 
 typedef struct	s_sphere
@@ -97,7 +103,6 @@ typedef struct	s_camera
 typedef struct	s_scene
 {
 	t_camera			camera;
-	constant t_object*	objects;
 	int					objects_num;
 }				t_scene;
 
@@ -106,13 +111,13 @@ typedef struct			s_hit
 {
 	float3				pos;
 	float3				normal;
-	float 				m;
 	float3				old_dir;
 	float3				mask;
 	float3				color;
 	float3				color_accum;
 	unsigned long		samples;
 	constant t_object	*object;
+	float 				m;
 	uint				seeds[2];
 	unsigned char		iterations;
 	t_material			material;

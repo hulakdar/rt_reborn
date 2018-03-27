@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/27 09:34:07 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/27 12:16:31 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,6 +26,7 @@ int main(void)
 	t_kernel	 	primary;
 	t_kernel	 	extended;
 	t_kernel	 	smooth;
+	t_kernel	 	draw;
 	t_kernel	 	size;
 	t_scene			scene;
 
@@ -34,17 +35,20 @@ int main(void)
 	size = rt_cl_create_kernel(&info, "t_hit_size");
 	primary = rt_cl_create_kernel(&info, "first_intersection");
 	extended = rt_cl_create_kernel(&info, "path_tracing");
+	draw = rt_cl_create_kernel(&info, "draw");
 	smooth = rt_cl_create_kernel(&info, "smooth");
 
 	cl_mem	hits = rt_cl_malloc_read(&info, 144 * job_size);
 	cl_mem	buff = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
 	cl_mem	out = rt_cl_malloc_read(&info, sizeof(cl_int) * job_size);
-	//cl_int ret = clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
+	cl_int ret = clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
 	//printf("%d\n", ret);
 	clSetKernelArg(primary.kernel, 0, sizeof(cl_mem), &hits);
-	//ret = clSetKernelArg(extended.kernel, 0, sizeof(t_scene), &scene);
+	ret = clSetKernelArg(extended.kernel, 0, sizeof(t_scene), &scene);
 	clSetKernelArg(extended.kernel, 0, sizeof(cl_mem), &hits);
 	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &buff);
+	clSetKernelArg(draw.kernel, 0, sizeof(cl_mem), &hits);
+	clSetKernelArg(draw.kernel, 1, sizeof(cl_mem), &buff);
 	clSetKernelArg(smooth.kernel, 0, sizeof(cl_mem), &buff);
 	clSetKernelArg(smooth.kernel, 1, sizeof(cl_mem), &out);
 
@@ -76,8 +80,9 @@ int main(void)
 	{
 		if (SDL_PollEvent(&event) && (event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)))
 				break ;
-		for (int i = 0; i < 2; i++)
+		for (int i = 0; i < 25; i++)
 			rt_cl_push_task(&extended, &job_size);
+		rt_cl_push_task(&draw, &job_size);
 		rt_cl_push_task(&smooth, &job_size);
 		rt_cl_device_to_host(&info, out, pixels, job_size * sizeof(int));
 		rt_cl_join(&info);
