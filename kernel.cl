@@ -26,12 +26,18 @@ static constant t_object	objs[] = {
 	{{1,0,0}, {0,0,1}, 0, plane, {.plane = (t_plane){{8,0,55}, {-1, 1, -1}}}},
 	{{0,0,1}, {0,1,1}, 0, cylinder, {.cylinder = (t_cylinder){{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
 	{{0,0,1}, {0,1,1}, 0, cone, {.cone = (t_cone){{8,0,35}, {0,1,0}, 0.5, -7, 7}}},
-	{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}}
+	{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}},
+	{{0,0,1}, {0,1,0}, 0, torus, {.torus = (t_torus){{0,-8,35}, {0, 1, 0}, 25, 1}}},
+	{{0,0,1}, {1,0,0}, 0, triangle, {.triangle = (t_triangle){{0,0,15}, {5, 0, 15}, {3, -5, 45}}}},
+	//{{0,0,1}, {1,0,0}, 0, mobius, {.mobius = (t_mobius){5, 1}}}
 };
 
 static constant t_camera 	camera = {
 	{0,0,0}, {0,0,1}, {1,1,1}, {500, 500}
+	//{4,0,-20}, {0,0,1}, {1,1,1}, {500, 500} /*for mobius*/
 };
+
+static constant float epsilon = 1e-8;
 
 static float4	to_quaternion(float3 a)
 {
@@ -237,6 +243,208 @@ static float3	disk_normal(constant t_disk *obj)
 	return (normalize(obj->normal));
 }
 
+static void	fourth_degree_equation(float4 *t, float A, float B, float C, float D, float E)
+{
+	float a = -3.0f * B * B / 8.0f / A / A + C / A;
+	float b = B * B * B / 8 / A / A / A - B * C / 2 / A / A + D / A;
+	float g = - 3.0f * B * B * B * B / 256.0f / A / A / A / A + C * B * B / 16.0f / A / A / A - B * D / 4.0f / A / A + E / A;
+	float P = -a * a / 12.0f - g;
+	float Q = -a * a * a / 108.0f + a * g / 3.0f - b * b / 8.0f;
+	float R = Q / 2.0f + sqrt(Q * Q / 4.0f + P * P * P / 27.0f);
+	float U = cbrt(R);
+	float U2;
+	U2 = (U == 0.0f) ? 0.0f : P / 3.0f / U;
+	float y = -5.0f / 6.0f * a - U + U2;
+	float W = sqrt(a + 2.0f * y);
+	(*t)[0] = -B / 4.0f / A + (W + sqrt(-(3.0f * a + 2.0f * y + 2.0f * b / W))) / 2.0f;
+	(*t)[1] = -B / 4.0f / A + (W - sqrt(-(3.0f * a + 2.0f * y + 2.0f * b / W))) / 2.0f;
+	(*t)[2] = -B / 4.0f / A + (-W + sqrt(-(3.0f * a + 2.0f * y - 2.0f * b / W))) / 2.0f;
+	(*t)[3] = -B / 4.0f / A + (-W - sqrt(-(3.0f * a + 2.0f * y - 2.0f * b / W))) / 2.0f;
+}
+
+static float  torus_intersect(constant t_torus *obj,
+								float3 ray_dir,
+								float3 ray_origin)
+{
+	float3	oc;
+	float	a;
+	float	b;
+	float	c;
+	float	d;
+	float	e;
+	float	m;
+	float	n;
+	float	o;
+	float	p;
+	float	q;
+	float4	t;
+	int 	i;
+	float 	ret;
+
+	oc = ray_origin - obj->origin;
+	m = dot(ray_dir, ray_dir);
+	n = dot(ray_dir, oc);
+	o = dot(oc, oc);
+	p = dot(ray_dir, obj->normal);
+	q = dot(oc, obj->normal);
+	a = m * m;
+	b = 4.0f * m * n;
+	c = 4.0f * n * n + 2.0f * m * o - 2.0f * (obj->big_radius2 + obj->small_radius2) * m + 4.0f * obj->big_radius2 * p * p;
+	d = 4.0f * n * o - 4.0f * (obj->big_radius2 + obj->small_radius2) * n + 8.0f * obj->big_radius2 * p * q;
+	e = o * o - 2.0f * (obj->big_radius2 + obj->small_radius2) * o + 4.0f * obj->big_radius2 * q * q + (obj->big_radius2 - obj->small_radius2) * (obj->big_radius2 - obj->small_radius2);
+	fourth_degree_equation(&t, a, b, c, d, e);
+	i = 0;
+	ret = 1000.0f;
+	while (i < 4)
+	{
+		ret = (t[i] >= 0 && t[i] < ret) ? t[i] : ret;
+		i++;
+	}
+	return ((ret < 999.0f) ? ret : -1);
+}
+
+static float3	torus_normal(constant t_torus *obj, float3 pos)
+{
+	float 	k;
+	float3	a;
+	float 	m;
+
+	k = dot(pos - obj->origin, obj->normal);
+	a = pos - obj->normal * k;
+	m = sqrt(obj->small_radius2 - k * k);
+	return (normalize(pos - a - (obj->origin - a) * m / (sqrt(obj->big_radius2) + m)));
+}
+
+static float  triangle_intersect(constant t_triangle *obj,
+								float3 ray_dir,
+								float3 ray_origin)
+{
+	float	denom;
+	float3	oc;
+	float3	normal;
+	float 	t;
+	float3	p;
+	float3	edge0;
+	float3	edge1;
+	float3	edge2;
+	float3	c0;
+	float3	c1;
+	float3	c2;
+
+	edge0 = obj->vertex1 - obj->vertex0;
+	edge1 = obj->vertex2 - obj->vertex1;
+	edge2 = obj->vertex0 - obj->vertex2;
+	normal = normalize(cross(edge0, edge1));
+
+	if ((denom = dot(ray_dir, normal)) == 0)
+		return (-1);
+	oc = ray_origin - obj->vertex0;
+	t = -dot(oc, normal) / denom;
+	if (t < 0)
+		return (-1);
+	p = ray_origin + ray_dir * t;
+	c0 = p - obj->vertex0;
+	c1 = p - obj->vertex1;
+	c2 = p - obj->vertex2;
+	if (dot(normal, cross(edge0, c0)) > 0 && dot(normal, cross(edge1, c1)) > 0 && dot(normal, cross(edge2, c2)) > 0)
+		return (t);
+	return (-1);
+}
+
+static float3	triangle_normal(constant t_triangle *obj)
+{
+	return (normalize(cross(obj->vertex1 - obj->vertex0, obj->vertex2 - obj->vertex1)));
+}
+
+static float	third_degree_equation(float A, float B, float C, float D)
+{
+	float p = (3.0f * A * C - B * B) / 3.0f/ A / A;
+	float q = (2 * B * B * B - 9 * A * B * C + 27.0f * A * A * D) / 27.0f / A / A / A;
+	float d = pow(p / 3.0f, 3) + pow(q / 2.0f, 2);
+	if (d < 0.0f)
+		return (-1);
+	float a = cbrt(-q / 2.0f + sqrt(d));
+	float b = cbrt(-q / 2.0f - sqrt(d));
+	float y = a + b; 
+	float x = y - B / 3.0f / A;
+	return (x);
+}
+
+int dblsgn(float x)
+{
+	return (x < -epsilon) ? (-1) : (x > epsilon); 
+}
+
+bool inside(float3 pt, constant t_mobius *obj)
+{
+	float x = pt.x;
+	float y = pt.y;
+	float z = pt.z;
+	float t = atan2(y, x);
+	float s;
+	if (dblsgn(sin(t / 2)) != 0)
+	{
+		s = z / sin(t / 2);
+	}
+	else
+	{
+		if (dblsgn(cos(t)) != 0)
+		{
+			s = (x / cos(t) - obj->radius) / cos(t / 2);
+		}
+		else
+		{
+			s = (y / sin(t) - obj->radius) / cos(t / 2);
+		}
+	}
+	x -= (obj->radius + s * cos(t / 2)) * cos(t);
+	y -= (obj->radius + s * cos(t / 2)) * sin(t);
+	z -= s * sin(t / 2);
+	if (dblsgn(x * x + y * y + z * z) != 0)
+	{
+		return false;
+	}	
+	return (s >= -obj->half_width - epsilon  && s <= obj->half_width + epsilon);
+}
+
+static float  mobius_intersect(constant t_mobius *obj,
+								float3 ray_dir,
+								float3 ray_origin)
+{
+	float ox = ray_origin.x;
+	float oy = ray_origin.y;
+	float oz = ray_origin.z;
+	float dx = ray_dir.x;
+	float dy = ray_dir.y;
+	float dz = ray_dir.z;
+	float R = obj->radius;
+		
+	float coef_0 = 0;
+	float coef_1 = 0;
+	float coef_2 = 0;
+	float coef_3 = 0;
+
+	coef_0 = ox * ox * oy + oy * oy * oy - 2 * ox * ox * oz - 2 * oy * oy * oz + oy * oz * oz - 2 * ox * oz * R - oy * R * R;
+	coef_1 = dy * ox * ox - 2 * dz * ox * ox + 2 * dx * ox * oy + 3 * dy * oy * oy - 2 * dz * oy * oy - 4 * dx * ox * oz - 4 * dy * oy * oz + 2 * dz * oy * oz + dy * oz * oz - 2 * dz * ox * R - 2 * dx * oz * R - dy * R * R;
+	coef_2 = 2 * dx * dy * ox - 4 * dx * dz * ox + dx * dx * oy + 3 * dy * dy * oy - 4 * dy * dz * oy + dz * dz * oy - 2 * dx * dx * oz - 2 * dy * dy * oz + 2 * dy * dz * oz - 2 * dx * dz * R;
+	coef_3 = dx * dx * dy + dy * dy * dy - 2 * dx * dx * dz - 2 * dy * dy * dz + dy * dz * dz;
+	float t = third_degree_equation(coef_3, coef_2, coef_1, coef_0);
+	float3 pos = ray_origin + t * ray_dir;
+	if (t > epsilon && inside(pos, obj))
+		return (t);
+	return (-1);
+}
+
+static float3	mobius_normal(constant t_mobius *obj, float3 pos)
+{
+	float x = pos.x;
+	float y = pos.y;
+	float z = pos.z;
+	float R = obj->radius;
+	float3 ret =  {2 * x * y - 2 * R * z - 4 * x * z, -R * R + x * x + 3 * y * y - 4 * y * z + z * z, -2 * R * x - 2 * x * x - 2 * y * y + 2 * y * z};
+	return (normalize(ret));
+}
+
 static void		intersect(	constant t_object *obj,
 							float3 ray_dir,
 							float3 ray_orig,
@@ -260,6 +468,15 @@ static void		intersect(	constant t_object *obj,
 			break;
 		case disk:
 			current = disk_intersect(&obj->spec.disk, ray_dir, ray_orig);
+			break;
+		case torus:
+			current = torus_intersect(&obj->spec.torus, ray_dir, ray_orig);
+			break;
+		case triangle:
+			current = triangle_intersect(&obj->spec.triangle, ray_dir, ray_orig);
+			break;
+		case mobius:
+			current = mobius_intersect(&obj->spec.mobius, ray_dir, ray_orig);
 			break;
 		default:
 			break;
@@ -319,6 +536,12 @@ static float3	find_normal(constant t_object *obj, float3 ray_orig, float m)
 			return (cone_normal(&obj->spec.cone, ray_orig, m));
 		case disk:
 			return (disk_normal(&obj->spec.disk));
+		case torus:
+			return (torus_normal(&obj->spec.torus, ray_orig));
+		case triangle:
+			return (triangle_normal(&obj->spec.triangle));
+		case mobius:
+			return (mobius_normal(&obj->spec.mobius, ray_orig));
 		default:
 			break;
 	}
@@ -340,7 +563,7 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, /*t_scene scene,*/ t_hit 
 		hit->pos = ray_orig + ray_dir * closest_dist;
 		hit->old_dir = ray_dir;
 		hit->mask *= closest->color;
-		hit->normal = find_normal(obj, ray_orig, hit->m);
+		hit->normal = find_normal(closest, hit->pos, hit->m);
 		if (closest->material.z > 0.0f)
 			hit->material = specular;
 		else if (closest->material.y > 0.0f)

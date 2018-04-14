@@ -23,8 +23,12 @@ typedef enum	e_obj_type
 	plane,
 	cylinder,
 	cone,
-	disk
+	disk,
+	torus,
+	triangle,
+	mobius
 }				t_obj_type;
+
 typedef enum	e_material
 {
 	diffuse, specular, refraction
@@ -68,6 +72,27 @@ typedef struct	s_disk
 	float 		radius2;
 }				t_disk;
 
+typedef struct	s_torus
+{
+	float3		origin;
+	float3		normal;
+	float 		big_radius2;
+	float 		small_radius2;
+}				t_torus;
+
+typedef struct	s_triangle
+{
+	float3		vertex0;
+	float3		vertex1;
+	float3		vertex2;
+}				t_triangle;
+
+typedef struct	s_mobius
+{
+	float 		radius;
+	float 		half_width;
+}				t_mobius;
+
 typedef	union	u_specs
 {
 	t_plane		plane;
@@ -75,6 +100,9 @@ typedef	union	u_specs
 	t_cylinder	cylinder;
 	t_cone		cone;
 	t_disk		disk;
+	t_torus		torus;
+	t_triangle	triangle;
+	t_mobius	mobius;
 }				t_specs;
 
 typedef struct	s_object
