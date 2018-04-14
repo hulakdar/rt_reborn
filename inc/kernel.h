@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/22 13:31:55 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/27 13:57:05 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/28 14:58:21 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,7 +39,6 @@ typedef enum	e_material
 typedef struct	s_sphere
 {
 	float3		origin;
-	float		radius;
 	float		r2;
 }				t_sphere;
 
@@ -102,8 +101,8 @@ typedef struct	s_camera
 
 typedef struct	s_scene
 {
-	t_camera			camera;
-	int					objects_num;
+	t_camera	camera;
+	int			objects_num;
 }				t_scene;
 
 # ifdef KERNEL_ONLY

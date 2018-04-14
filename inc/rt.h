@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/13 18:11:20 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/22 16:59:34 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/28 13:11:35 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,7 @@
 # else
 # include <SDL2/SDL.h>
 #endif
+#include <time.h>
 
 enum {
     NOC_FILE_DIALOG_OPEN    = 1 << 0,   // Create an open file dialog.

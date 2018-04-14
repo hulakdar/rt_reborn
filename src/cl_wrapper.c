@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/02 14:37:46 by skamoza           #+#    #+#             */
-/*   Updated: 2018/03/27 09:28:11 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/03/28 14:30:03 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -170,7 +170,7 @@ cl_int		rt_cl_host_to_device(
 	status = clEnqueueWriteBuffer(
 				info->command_queue,
 				obj,
-				CL_TRUE,
+				CL_FALSE,
 				0,
 				size,
 				src,
