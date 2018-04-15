@@ -26,7 +26,9 @@ typedef enum	e_obj_type
 	disk,
 	torus,
 	triangle,
-	mobius
+	mobius,
+	bool_substraction,
+	bool_intersection
 }				t_obj_type;
 
 typedef enum	e_material
@@ -93,6 +95,20 @@ typedef struct	s_mobius
 	float 		half_width;
 }				t_mobius;
 
+struct	s_object;
+
+typedef struct	s_bool_substraction
+{
+	const __constant	struct s_object	*obj1;
+	const __constant	struct s_object	*obj2;
+}				t_bool_substraction;
+
+typedef struct	s_bool_intersection
+{
+	const __constant	struct s_object	*obj1;
+	const __constant	struct s_object	*obj2;
+}				t_bool_intersection;
+
 typedef	union	u_specs
 {
 	t_plane		plane;
@@ -103,6 +119,8 @@ typedef	union	u_specs
 	t_torus		torus;
 	t_triangle	triangle;
 	t_mobius	mobius;
+	t_bool_substraction bool_substraction;
+	t_bool_intersection bool_intersection;
 }				t_specs;
 
 typedef struct	s_object

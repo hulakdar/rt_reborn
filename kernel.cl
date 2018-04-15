@@ -13,6 +13,12 @@
 #define KERNEL_ONLY
 #include "kernel.h"
 
+static constant	t_object o1 = {{1,0,0}, {1,0,0}, 0, sphere, {.sphere = (t_sphere){{2,0,20}, 3, 100}}};
+static constant	t_object o2 = {{1,0,0}, {0,1,0}, 0, sphere, {.sphere = (t_sphere){{4,0,16}, 3, 100}}};
+
+static constant	t_object o3 = {{1,0,0}, {1,0,0}, 0, sphere, {.sphere = (t_sphere){{-6,0,20}, 3, 100}}};
+static constant	t_object o4 = {{1,0,0}, {0,1,0}, 0, sphere, {.sphere = (t_sphere){{-2,0,21}, 3, 100}}};
+
 static constant t_object	objs[] = {
 	{{1,0,0}, {1,1,1}, 1, sphere, {.sphere = (t_sphere){{0,17,45}, 5, 100}}},
 	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{-8,-8,44}, 6, 100}}},
@@ -29,6 +35,8 @@ static constant t_object	objs[] = {
 	{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}},
 	{{0,0,1}, {0,1,0}, 0, torus, {.torus = (t_torus){{0,-8,35}, {0, 1, 0}, 25, 1}}},
 	{{0,0,1}, {1,0,0}, 0, triangle, {.triangle = (t_triangle){{0,0,15}, {5, 0, 15}, {3, -5, 45}}}},
+	{{0,0,1}, {0,1,0}, 0, bool_substraction, {.bool_substraction = (t_bool_substraction){&o1, &o2}}},
+	{{0,0,1}, {0,1,0}, 0, bool_intersection, {.bool_intersection = (t_bool_intersection){&o3, &o4}}}
 	//{{0,0,1}, {1,0,0}, 0, mobius, {.mobius = (t_mobius){5, 1}}}
 };
 
@@ -88,7 +96,8 @@ static void ft_roots(float2 *t, float a, float b, float c)
 
 static float  sphere_intersect(constant t_sphere *obj,
 								float3 ray_dir,
-								float3 ray_origin)
+								float3 ray_origin,
+								float2* roots)
 {
 	float	a;
 	float	b;
@@ -101,6 +110,8 @@ static float  sphere_intersect(constant t_sphere *obj,
 	b = 2 * dot(ray_dir, oc);
 	c = dot(oc, oc) - (obj->radius * obj->radius);
 	ft_roots(&t, a, b, c);
+	if (roots)
+		*roots = t;
 	if ((t.x < 0.0 && t.y >= 0.0) || (t.y < 0.0 && t.x >= 0.0))
 		return t.x > t.y ? t.x : t.y;
 	else
@@ -445,6 +456,67 @@ static float3	mobius_normal(constant t_mobius *obj, float3 pos)
 	return (normalize(ret));
 }
 
+static float	bool_substraction_intersect(constant t_bool_substraction *obj,
+											float3 ray_dir,
+											float3 ray_origin,
+											const __constant t_object **closest)
+{
+	float2	roots1;
+	float2	roots2;
+	float 	t1;
+	float 	t2;
+	t1 = sphere_intersect(&obj->obj1->spec.sphere, ray_dir, ray_origin, &roots1);
+	t2 = sphere_intersect(&obj->obj2->spec.sphere, ray_dir, ray_origin, &roots2);
+	if (t1 <= 0)
+		return(-1);
+	if (t2 <= 0)
+	{
+		*closest = obj->obj1;
+		return (t1);
+	}
+	roots1 = (roots1.x > roots1.y) ? roots1.yx : roots1;
+	roots2 = (roots2.x > roots2.y) ? roots2.yx : roots2;
+	if (roots1.x < 0)
+		return (-1);
+	if (roots1.x > roots2.x && roots1.x < roots2.y)
+	{
+		*closest = obj->obj2;
+		return (roots2.y);
+	}
+	*closest = obj->obj1;
+	return (t1);
+}
+
+static float	bool_intersection_intersect(constant t_bool_intersection *obj,
+											float3 ray_dir,
+											float3 ray_origin,
+											const __constant t_object **closest)
+{
+	float2	roots1;
+	float2	roots2;
+	float 	t1;
+	float 	t2;
+	t1 = sphere_intersect(&obj->obj1->spec.sphere, ray_dir, ray_origin, &roots1);
+	t2 = sphere_intersect(&obj->obj2->spec.sphere, ray_dir, ray_origin, &roots2);
+	if (t1 <= 0 || t2 <= 0)
+		return(-1);
+	roots1 = (roots1.x > roots1.y) ? roots1.yx : roots1;
+	roots2 = (roots2.x > roots2.y) ? roots2.yx : roots2;
+	if (roots1.x < 0 && roots2.x < 0)
+		return (-1);
+	if (roots1.x > 0 && roots1.x > roots2.x && roots1.x < roots2.y)
+	{
+		*closest = obj->obj1;
+		return (roots1.x);
+	}
+	if (roots2.x > 0 && roots2.x > roots1.x && roots2.x < roots1.y)
+	{
+		*closest = obj->obj2;
+		return (roots2.x);
+	}
+	return (-1);
+}
+
 static void		intersect(	constant t_object *obj,
 							float3 ray_dir,
 							float3 ray_orig,
@@ -453,9 +525,10 @@ static void		intersect(	constant t_object *obj,
 							float 	*m)
 {
 	float current;
+	const __constant t_object *closest_obj;
 	switch (obj->type) {
 		case sphere:
-			current = sphere_intersect(&obj->spec.sphere, ray_dir, ray_orig);
+			current = sphere_intersect(&obj->spec.sphere, ray_dir, ray_orig, NULL);
 			break;
 		case plane:
 			current = plane_intersect(&obj->spec.plane, ray_dir, ray_orig);
@@ -473,10 +546,15 @@ static void		intersect(	constant t_object *obj,
 			current = torus_intersect(&obj->spec.torus, ray_dir, ray_orig);
 			break;
 		case triangle:
-			current = triangle_intersect(&obj->spec.triangle, ray_dir, ray_orig);
 			break;
 		case mobius:
 			current = mobius_intersect(&obj->spec.mobius, ray_dir, ray_orig);
+			break;
+		case bool_substraction:
+			current = bool_substraction_intersect(&obj->spec.bool_substraction, ray_dir, ray_orig, &closest_obj);
+			break;
+		case bool_intersection:
+			current = bool_intersection_intersect(&obj->spec.bool_intersection, ray_dir, ray_orig, &closest_obj);
 			break;
 		default:
 			break;
@@ -484,7 +562,10 @@ static void		intersect(	constant t_object *obj,
 	if (current <= 0.0 || current > *closest_dist)
 		return ;
 	*closest_dist = current;
-	*closest = obj;
+	if (obj->type == bool_substraction || obj->type == bool_intersection)
+		*closest = closest_obj;
+	else
+		*closest = obj;
 }
 
 static float3	random_path_sphere(constant t_sphere	*obj, t_hit *hit, float *magnitude)
