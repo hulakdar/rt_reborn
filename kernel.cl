@@ -13,10 +13,10 @@
 #define KERNEL_ONLY
 #include "kernel.h"
 
-const sampler_t sampler = CLK_ADDRESS_NONE | CLK_FILTER_NEAREST | CLK_NORMALIZED_COORDS_FALSE;
+const sampler_t sampler = CLK_ADDRESS_REPEAT | CLK_FILTER_NEAREST | CLK_NORMALIZED_COORDS_FALSE;
 
 static constant t_object objs[] = {
-	{{1, 0, 0}, {1, 1, 1}, 1, sphere, {.sphere = {{0, 17, 45}, 25}}},
+	{{1, 0, 0}, {1, 1, 1}, 1, sphere, {.sphere = {{0, 20, 46}, 25}}},
 	{{1, 0, 0}, {1, 0, 1}, 0, sphere, {.sphere = {{-8, -8, 44}, 36}}},
 	{{0, 1, 0}, {1, 1, 1}, 0, sphere, {.sphere = {{7, -5, 45}, 36}}},
 	{{0, 0, 1}, {1, 1, 1}, 0, sphere, {.sphere = {{-8, 0, 55}, 49}}},
@@ -27,20 +27,29 @@ static constant t_object objs[] = {
 	{{1, 0, 0}, {0, 0, 1}, 0, plane, {.plane = {{0, 0, 60}, {0, 0, 1}}}},
 	{{1, 0, 0}, {1, 1, 1}, 0, cone, {.cone = {{8, 0, 25}, {0, 1, 0}, 0.4, -7, 0}}},
 	{{1, 0, 0}, {1, 1, 1}, 0, cylinder, {.cylinder = {{-8, 5, 35}, {0, 0.9, 0}, 4, 16, 16}}},
-	{{1, 0, 0}, {1, 1, 1}, 0, disk, {.disk = {{0, 10, 45}, {0, 1, 0}, 30}}}};
+	{{1, 0, 0}, {1, 1, 1}, 0, disk, {.disk = {{10, 5, 45}, {0, -1, 1}, 30}}}};
 
-static constant float3 texture[][2] = {
-	{{0.f, 1.f, 0.f}, {0.f, 1.f, 0.f}},
-	{{1.f, 0.f, 0.f}, {0.f, 0.f, 1.f}}};
+static constant float3 texture[][4] = {
+	{{0.f, 1.f, 0.f}, {1.f, 0.f, 0.f}, {0.f, 0.f, 1.f},  {1.f, 0.f, 0.f}},
+	{{1.f, 1.f, 1.f}, {1.f, 1.f, 1.f}, {1.f, 1.f, 1.f},  {1.f, 1.f, 1.f}},
+	{{1.f, 0.f, 1.f}, {1.f, 0.f, 1.f}, {0.f, 0.f, 1.f},  {1.f, 0.f, 1.f}},
+	{{1.f, 0.f, 0.f}, {1.f, 0.f, 0.f}, {1.f, 0.f, 0.f},  {0.f, 0.f, 1.f}}};
 
-static constant t_camera camera = {{0, 0, 0},
+static constant t_camera camera = {
+	{0, 0, -20},
 	{0, 0, 1},
 	{1, 1, 1},
 	{1000, 1000}};
 
-static constant float mask[3][3] = {{0.10, 0.15, 0.10},
-	{0.15, 0.00, 0.15},
-	{0.10, 0.15, 0.10}};
+static constant float mask[3][3] = {
+	/*
+	   {0.15, 0.10, 0.15},
+	   {0.10, 0.00, 0.10},
+	   {0.15, 0.10, 0.15}};
+	 */
+{0, 0, 0},
+{0, 1, 0},
+{0, 0, 0}};
 
 static constant int maskSize = 1;
 
@@ -324,15 +333,13 @@ static void trace_ray(float3 ray_orig,
 		hit->pos = ray_orig + ray_dir * closest_dist;
 		hit->normal = find_normal(closest, hit->pos, hit->m);
 		hit->normal = dot(hit->normal, ray_dir) > 0.0f ? hit->normal : -hit->normal;
+		hit->mask *= texture[(int)(((hit->normal.y / 2.f + 0.5f) * 4))]
+			[(int)(((hit->normal.x / 2.f + 0.5f) * 4))];
 		/*
-		hit->mask *= closest->color;
-		   */
-		hit->pos = hit->pos + hit->normal * 0.03f;
-		hit->mask *= texture[(int)fabs(((hit->normal.x / 2 + 0.5f) * 2.f ) *
-				2)][(int)fabs(((hit->normal.y / 2 + 0.5f) * 2.f + 0.5f) * 2)];
-		   /*
-		   hit->mask *= read_imagef(tex, sampler, (int2)(((hit->normal.x + 1.f) / 2.f) * 4,
-		 (hit->normal.y + 1.f) / 2.f) * 2).xyz;
+		   hit->mask *= closest->color;
+		   hit->pos = hit->pos + hit->normal * 0.00003f;
+		   hit->mask *= read_imagef(tex, sampler,
+		   (int2)(((hit->normal.x / 2) + 0.5f), (hit->normal.y / 2) + 0.5f) * 2).xyz;
 		 */
 		hit->color += hit->mask * (closest->emission);
 		if (closest->material.z > 0.0f)
@@ -341,10 +348,10 @@ static void trace_ray(float3 ray_orig,
 			hit->material = refraction;
 		else {
 			hit->material = diffuse;
-			   float3 direct = { 0.f, 0.f, 0.f };
-			   for (int i = 0; i < objnum; i++)
-			   direct += find_direct(&obj[i], obj, objnum, hit);
-			   hit->color += direct * hit->mask * 0.42f;
+			float3 direct = {0.f, 0.f, 0.f};
+			for (int i = 0; i < objnum; i++)
+				direct += find_direct(&obj[i], obj, objnum, hit);
+			hit->color += direct * hit->mask * 0.42f;
 			hit->mask *= dot(ray_dir, hit->normal);
 		}
 	}
@@ -357,43 +364,46 @@ static float3 construct_ray(uint2 coords, t_camera camera, t_hit* hit) {
 	hit->pos = camera.origin;
 	return (normalize(
 				(float3)(
-					(((coords.x + get_random(&hit->seeds[0], &hit->seeds[1])) / camera.canvas.x) * 2 - 1) * (camera.canvas.x / camera.canvas.y),
-					1 - 2 * ((coords.y + get_random(&hit->seeds[0], &hit->seeds[1])) / camera.canvas.y),
-					2.0) * 0.5f));
+					(((coords.x + get_random(&hit->seeds[0], &hit->seeds[1])) /
+					  camera.canvas.x) *
+					 2 -
+					 1) *
+					(camera.canvas.x / camera.canvas.y),
+					1 - 2 * ((coords.y + get_random(&hit->seeds[0], &hit->seeds[1])) /
+						camera.canvas.y),
+					2.0) *
+				0.5f));
 }
 
-__kernel __attribute__((vec_type_hint(float3))) void first_intersection(
-		t_scene scene,
-		global t_hit* hits,
-		uint2 seeds,
-		image2d_t tex) {
-	int i = get_global_id(0);
-	uint2 coords = {i % camera.canvas.x, i / camera.canvas.x};
-	t_hit hit;
-	float3 ray_dir = construct_ray(coords, camera, &hit);
+__kernel __attribute__((vec_type_hint(float3)))
+	void first_intersection( t_scene scene, global t_hit* hits, uint2 seeds, image2d_t tex) {
+		int i = get_global_id(0);
+		uint2 coords = {i % camera.canvas.x, i / camera.canvas.x};
+		t_hit hit;
+		float3 ray_dir = construct_ray(coords, camera, &hit);
 
-	hit.seeds[0] = mad24(coords.x, seeds.x, coords.y);
-	hit.seeds[1] = mad24(coords.y, seeds.y, coords.x);
-	hit.color_accum = (float3)(0, 0, 0);
-	hit.samples = 0;
-	trace_ray(camera.origin, ray_dir, scene, &hit, tex);
-	hits[i] = hit;
-}
+		hit.seeds[0] = mad24(coords.x, (unsigned int)&coords, seeds.x);
+		hit.seeds[1] = mad24(coords.y, (unsigned int)&coords, seeds.y);
+		hit.color_accum = (float3)(0, 0, 0);
+		hit.samples = 0;
+		trace_ray(camera.origin, ray_dir, scene, &hit, tex);
+		hits[i] = hit;
+	}
 
-__kernel __attribute__((vec_type_hint(float3))) void
-painting(t_scene scene, global t_hit* hits, uint2 seeds, image2d_t tex) {
-	int i = get_global_id(0);
-	uint2 coords = {i % camera.canvas.x, i / camera.canvas.x};
-	t_hit hit;
-	float3 ray_dir = construct_ray(coords, camera, &hit);
+__kernel __attribute__((vec_type_hint(float3)))
+	void painting(t_scene scene, global t_hit* hits, uint2 seeds, image2d_t tex) {
+		int i = get_global_id(0);
+		uint2 coords = {i % camera.canvas.x, i / camera.canvas.x};
+		t_hit hit;
+		float3 ray_dir = construct_ray(coords, camera, &hit);
 
-	hit.seeds[0] = seeds.x;
-	hit.seeds[1] = seeds.y;
-	hit.color_accum = (float3)(0, 0, 0);
-	hit.samples = 0;
-	trace_ray(camera.origin, ray_dir, scene, &hit, tex);
-	hits[i] = hit;
-}
+		hit.seeds[0] = seeds.x;
+		hit.seeds[1] = seeds.y;
+		hit.color_accum = (float3)(0, 0, 0);
+		hit.samples = 0;
+		trace_ray(camera.origin, ray_dir, scene, &hit, tex);
+		hits[i] = hit;
+	}
 
 __kernel __attribute__((vec_type_hint(float3))) void
 path_tracing(t_scene scene, global t_hit* hits, image2d_t tex) {
@@ -402,33 +412,35 @@ path_tracing(t_scene scene, global t_hit* hits, image2d_t tex) {
 	float3 ray_dir;
 	t_hit hit = hits[i];
 
-	if (__builtin_expect(hit.iterations > 100 || !hit.object ||
-				fast_length(hit.mask) < 0.0001 ||
+	if (__builtin_expect(hit.iterations > 255 || !hit.object ||
 				fast_length(hit.color) >= 1.45f,
 				false)) {
 		hit.color_accum = hit.color_accum + min(hit.color, 1.0f);
-		if (fast_length(hit.color) > 0.0001)
-			hit.samples++;
+		//		if (fast_length(hit.color) > 0.0001)
+		hit.samples++;
 		ray_dir = construct_ray(coords, camera, &hit);
 	} else if (hit.material == specular)
-		ray_dir = -hit.old_dir - hit.normal * 2 * dot(hit.old_dir, hit.normal);
-	else if (hit.material == refraction)
-	{
-		ray_dir = -hit.old_dir - (2.0f * dot(hit.normal, hit.old_dir)) * hit.normal;
+		ray_dir = hit.old_dir - hit.normal * 2.0f * dot(hit.old_dir, hit.normal);
+	else if (hit.material == refraction) {
+		ray_dir = hit.old_dir - hit.normal * 2.0f * dot(hit.old_dir, hit.normal);
 		int into = dot(hit.normal, hit.old_dir) > 0.0f ? 1 : -1;
 		float nc = 1.f;
 		float nt = 1.5f;
 		float nnt = into > 0.f ? nc / nt : nt / nc;
 		float ddn = dot(hit.old_dir, hit.normal * into);
 		float cos2t = 1.f - nnt * nnt * (1 - ddn * ddn);
-		if (cos2t > 0.0f)
-		{
+		if (cos2t > 0.0f) {
 			float kk = into * (ddn * nnt + native_sqrt(cos2t));
-			float3 transDir = normalize(nnt * hit.old_dir - kk *
-					hit.normal); float a = nt - nc; float b = nt + nc; float R0 = a * a / (b *
-						b); float c = 1 - (into > 1 ? -ddn : dot(transDir, hit.normal)); float Re =
-					R0 + (1 - R0) * c * c * c * c*c; float Tr = 1.f - Re; float P = .25f + .5f *
-					Re; float RP = Re / P; float TP = Tr / (1.f - P);
+			float3 transDir = normalize(nnt * hit.old_dir - kk * hit.normal);
+			float a = nt - nc;
+			float b = nt + nc;
+			float R0 = a * a / (b * b);
+			float c = 1 - (into > 1 ? -ddn : dot(transDir, hit.normal));
+			float Re = R0 + (1 - R0) * c * c * c * c * c;
+			float Tr = 1.f - Re;
+			float P = .25f + .5f * Re;
+			float RP = Re / P;
+			float TP = Tr / (1.f - P);
 
 			if (get_random(&hit.seeds[0], &hit.seeds[1]) < P)
 				hit.mask *= RP;
@@ -437,8 +449,7 @@ path_tracing(t_scene scene, global t_hit* hits, image2d_t tex) {
 				ray_dir = transDir;
 			}
 		}
-	}
-	else {
+	} else {
 		float rand1 = 2.0f * M_PI * get_random(&hit.seeds[0], &hit.seeds[1]);
 		float rand2 = get_random(&hit.seeds[0], &hit.seeds[1]);
 		float rand2s = native_sqrt(rand2);

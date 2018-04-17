@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/04/14 15:46:40 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/04/16 16:35:39 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -125,7 +125,8 @@ int main(void)
 		if (SDL_PollEvent(&event) && (event.type == SDL_QUIT ||
 		(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)))
 				break ;
-		rt_cl_push_task(&extended, &job_size);
+		for (int i = 0; i < 10; ++i)
+			rt_cl_push_task(&extended, &job_size);
 		rt_cl_push_task(&draw, &job_size);
 		rt_cl_push_task(&smooth, &job_size);
 
