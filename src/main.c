@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/16 15:28:10 by skamoza           #+#    #+#             */
-/*   Updated: 2018/04/16 16:35:39 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/04/19 17:54:33 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,6 +31,43 @@ int main(void)
 	t_kernel	 	draw;
 	t_kernel	 	size;
 	t_scene			scene;
+
+	static cl_float texture[][2][2][3] = {
+		{
+			{{1.f, 1.f, 1.f}, {1.f, 1.f, 1.f}},
+			{{1.f, 1.f, 1.f}, {1.f, 1.f, 1.f}}
+		},
+		{
+			{{0.f, 1.f, 0.f}, {0.f, 1.f, 0.f}},
+			{{0.f, 0.f, 1.f}, {0.f, 0.f, 1.f}}
+		},
+		{
+			{{1.f, 1.f, 1.f}, {0.f, 0.f, 0.f}},
+			{{0.f, 0.f, 0.f}, {1.f, 1.f, 1.f}}
+		},
+		{
+			{{1.f, 1.f, 1.f}, {1.f, 1.f, 1.f}},
+			{{1.f, 1.f, 1.f}, {1.f, 1.f, 1.f}}
+		},
+	};
+	static cl_float normal_map[][2][2][3] = {
+		{
+			{{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
+			{{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}}
+		},
+		{
+			{{0.f, 0.f, 0.f}, {2.f, 2.f, 2.f}},
+			{{0.f, 0.f, 0.f}, {2.f, 2.f, 2.f}}
+		},
+		{
+			{{-1.f, 1.f, -1.f}, {0.f, -1.f, 0.f}},
+			{{0.f, 0.f, 0.f}, {1.f, 2.f, 1.f}}
+		},
+		{
+			{{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
+			{{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}}
+		},
+	};
 
 	SDL_Init(SDL_INIT_VIDEO);
 
@@ -78,10 +115,10 @@ int main(void)
 		NULL
 	};
 	cl_image_desc tex_desc = {
-		CL_MEM_OBJECT_IMAGE2D,
-		4,
+		CL_MEM_OBJECT_IMAGE3D,
 		2,
-		1,
+		2,
+		4,
 		1,
 		0,
 		0,
@@ -90,19 +127,23 @@ int main(void)
 		NULL
 	};
 	cl_mem img = clCreateImage(info.context, CL_MEM_READ_WRITE, &fmt, &desc, NULL, NULL);
-	cl_mem tex = clCreateImage(info.context, CL_MEM_READ_WRITE, &fmt, &tex_desc, NULL, NULL);
+	cl_mem tex = clCreateImage(info.context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, &fmt, &tex_desc, texture, NULL);
+	cl_mem normal = clCreateImage(info.context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, &fmt, &tex_desc, normal_map, NULL);
 
 	clSetKernelArg(primary.kernel, 0, sizeof(t_scene), &scene);
 	clSetKernelArg(primary.kernel, 1, sizeof(cl_mem), &hits);
 	clSetKernelArg(primary.kernel, 2, sizeof(cl_uint2), &seeds);
 	clSetKernelArg(primary.kernel, 3, sizeof(cl_mem), &tex);
+	clSetKernelArg(primary.kernel, 4, sizeof(cl_mem), &normal);
 	clSetKernelArg(painting.kernel, 0, sizeof(t_scene), &scene);
 	clSetKernelArg(painting.kernel, 1, sizeof(cl_mem), &hits);
 	clSetKernelArg(painting.kernel, 2, sizeof(cl_uint2), &seeds);
 	clSetKernelArg(painting.kernel, 3, sizeof(cl_mem), &tex);
+	clSetKernelArg(painting.kernel, 4, sizeof(cl_mem), &normal);
 	clSetKernelArg(extended.kernel, 0, sizeof(t_scene), &scene);
 	clSetKernelArg(extended.kernel, 1, sizeof(cl_mem), &hits);
 	clSetKernelArg(extended.kernel, 2, sizeof(cl_mem), &tex);
+	clSetKernelArg(extended.kernel, 3, sizeof(cl_mem), &normal);
 	clSetKernelArg(draw.kernel, 0, sizeof(cl_mem), &hits);
 	clSetKernelArg(draw.kernel, 1, sizeof(cl_mem), &img);
 	clSetKernelArg(smooth.kernel, 0, sizeof(cl_mem), &img);

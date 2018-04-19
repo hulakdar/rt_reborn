@@ -6,7 +6,7 @@
 /*   By: skamoza <marvin@42.fr>                     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2018/03/22 13:31:55 by skamoza           #+#    #+#             */
-/*   Updated: 2018/04/16 18:58:18 by skamoza          ###   ########.fr       */
+/*   Updated: 2018/04/19 17:54:32 by skamoza          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -87,6 +87,8 @@ typedef struct	s_object
 	float3		material;
 	float3		color;
 	float		emission;
+	int			texture;
+	int			normal_map;
 	t_obj_type	type;
 	t_specs		spec;
 }				t_object;
