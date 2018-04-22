@@ -19,24 +19,37 @@ static constant	t_object o2 = {{1,0,0}, {0,1,0}, 0, sphere, {.sphere = (t_sphere
 static constant	t_object o3 = {{1,0,0}, {1,0,0}, 0, sphere, {.sphere = (t_sphere){{-6,0,20}, 3, 100}}};
 static constant	t_object o4 = {{1,0,0}, {0,1,0}, 0, sphere, {.sphere = (t_sphere){{-2,0,21}, 3, 100}}};
 
+static constant t_object	pipes1[] = {
+	{{0,0,1}, {0,0,1}, 0, cylinder, {.cylinder = (t_cylinder){{-2.5,-2.5,15}, {0,0,1}, 2, 4, 5}}}
+};
+
+static constant t_object	pipes2[] = {
+	{{0,0,1}, {0,0,1}, 0, cylinder, {.cylinder = (t_cylinder){{2.5,-1.5,15}, {0,0,1}, 0.8, 0.64, 2}}},
+	{{0,0,1}, {0,1,0}, 0, cylinder, {.cylinder = (t_cylinder){{4.5,-1.5,15}, {0,0,1}, 0.8, 0.64, 2}}},
+	{{0,0,1}, {1,0,1}, 0, cylinder, {.cylinder = (t_cylinder){{2.5,-3.5,15}, {0,0,1}, 0.8, 0.64, 2}}},
+	{{0,0,1}, {1,0,0}, 0, cylinder, {.cylinder = (t_cylinder){{4.5,-3.5,15}, {0,0,1}, 0.8, 0.64, 2}}}
+};
+
 static constant t_object	objs[] = {
 	{{1,0,0}, {1,1,1}, 1, sphere, {.sphere = (t_sphere){{0,17,45}, 5, 100}}},
-	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{-8,-8,44}, 6, 100}}},
+	//{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{-8,-8,44}, 6, 100}}},
 	{{1,0,0}, {1,0,1}, 0, sphere, {.sphere = (t_sphere){{0,0,270}, 200, 4}}},
 	{{1,0,0}, {0,1,1}, 0, sphere, {.sphere = (t_sphere){{215,0,55}, 200, 4}}},
 	{{1,0,0}, {1,1,0}, 0, sphere, {.sphere = (t_sphere){{-215,0,55}, 200, 100}}},
 	{{1,0,0}, {1,0,0}, 0, sphere, {.sphere = (t_sphere){{0,215,55}, 200, 4}}},
 	{{1,0,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{0,-210,55}, 200, 100}}},
-	{{0,1,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{7,-5,45}, 6, 100}}},
-	{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{-8,0,55}, 7, 4}}},
-	{{1,0,0}, {0,0,1}, 0, plane, {.plane = (t_plane){{8,0,55}, {-1, 1, -1}}}},
-	{{0,0,1}, {0,1,1}, 0, cylinder, {.cylinder = (t_cylinder){{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
-	{{0,0,1}, {0,1,1}, 0, cone, {.cone = (t_cone){{8,0,35}, {0,1,0}, 0.5, -7, 7}}},
-	{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}},
-	{{0,0,1}, {0,1,0}, 0, torus, {.torus = (t_torus){{0,-8,35}, {0, 1, 0}, 25, 1}}},
-	{{0,0,1}, {1,0,0}, 0, triangle, {.triangle = (t_triangle){{0,0,15}, {5, 0, 15}, {3, -5, 45}}}},
-	{{0,0,1}, {0,1,0}, 0, bool_substraction, {.bool_substraction = (t_bool_substraction){&o1, &o2}}},
-	{{0,0,1}, {0,1,0}, 0, bool_intersection, {.bool_intersection = (t_bool_intersection){&o3, &o4}}}
+	//{{0,1,0}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{7,-5,45}, 6, 100}}},
+	//{{0,0,1}, {1,1,1}, 0, sphere, {.sphere = (t_sphere){{-8,0,55}, 7, 4}}},
+	//{{1,0,0}, {0,0,1}, 0, plane, {.plane = (t_plane){{8,0,55}, {-1, 1, -1}}}},
+	//{{0,0,1}, {0,1,1}, 0, cylinder, {.cylinder = (t_cylinder){{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
+	//{{0,0,1}, {0,1,1}, 0, cone, {.cone = (t_cone){{8,0,35}, {0,1,0}, 0.5, -7, 7}}},
+	//{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}},
+	//{{0,0,1}, {0,1,0}, 0, torus, {.torus = (t_torus){{0,-8,35}, {0, 1, 0}, 25, 1}}},
+	//{{0,0,1}, {1,0,0}, 0, triangle, {.triangle = (t_triangle){{0,0,15}, {5, 0, 15}, {3, -5, 45}}}},
+	//{{0,0,1}, {0,1,0}, 0, bool_substraction, {.bool_substraction = (t_bool_substraction){&o1, &o2}}},
+	//{{0,0,1}, {0,1,0}, 0, bool_intersection, {.bool_intersection = (t_bool_intersection){&o3, &o4}}},
+	{{1,0,0}, {1,0.5,0}, 0, cube, {.cube = (t_cube){{-5,-5,15}, {0, 0, 20}, 1, pipes1}}},
+	{{1,0,0}, {1,0.5,0}, 0, cube, {.cube = (t_cube){{1,-5,15}, {6, 0, 17}, 4, pipes2}}}
 	//{{0,0,1}, {1,0,0}, 0, mobius, {.mobius = (t_mobius){5, 1}}}
 };
 
@@ -381,12 +394,12 @@ static float	third_degree_equation(float A, float B, float C, float D)
 	return (x);
 }
 
-int dblsgn(float x)
+static int dblsgn(float x)
 {
 	return (x < -epsilon) ? (-1) : (x > epsilon); 
 }
 
-bool inside(float3 pt, constant t_mobius *obj)
+static bool inside(float3 pt, constant t_mobius *obj)
 {
 	float x = pt.x;
 	float y = pt.y;
@@ -517,6 +530,122 @@ static float	bool_intersection_intersect(constant t_bool_intersection *obj,
 	return (-1);
 }
 
+static void swap(float* a, float* b)
+{
+	float c;
+	c = *a;
+	*a = *b;
+	*b = c;
+}
+
+static float  cube_intersect(constant t_cube *obj,
+								float3 ray_dir,
+								float3 ray_origin,
+								float* m,
+								const __constant t_object **closest)
+{
+	float 	t_min;
+	float 	t_max;
+	float 	t_y_min;
+	float 	t_y_max;
+	float 	t_z_min;
+	float 	t_z_max;
+	float2	side = {0, 0};
+	float 	t_pipe = MAXFLOAT;
+
+	t_min = (obj->min.x  - ray_origin.x) / ray_dir.x;
+	t_max = (obj->max.x  - ray_origin.x) / ray_dir.x;
+	if (t_min > t_max)
+		swap(&t_min, &t_max);
+	t_y_min = (obj->min.y  - ray_origin.y) / ray_dir.y;
+	t_y_max = (obj->max.y  - ray_origin.y) / ray_dir.y;
+	if (t_y_min > t_y_max)
+		swap(&t_y_min, &t_y_max);
+	if (t_min > t_y_max || t_y_min > t_max)
+		return (-1);
+	if (t_y_min > t_min)
+	{
+		side.x = 1;
+		t_min = t_y_min;
+	}
+	if (t_y_max < t_max)
+	{
+		side.y = 1;
+		t_max = t_y_max;
+	}
+	t_z_min = (obj->min.z - ray_origin.z) / ray_dir.z;
+	t_z_max = (obj->max.z - ray_origin.z) / ray_dir.z;
+	if (t_z_min > t_z_max)
+		swap(&t_z_min, &t_z_max);
+	if (t_min > t_z_max || t_z_min > t_max)
+		return (-1);
+	if (t_z_min > t_min)
+	{
+		side.x = 2;
+		t_min = t_z_min;
+	}
+	if (t_z_max < t_max)
+	{
+		side.y = 2;
+		t_max = t_z_max;
+	}
+
+	if (obj->objs)
+	{
+		int 	i = 0;
+		int 	i_closet;
+		float 	m_current;
+		while (i < obj->pipes_number)
+		{
+			float current = cylinder_intersect(&obj->objs[i].spec.cylinder, ray_dir, ray_origin, &m_current);
+			if (current > 0 && current < t_pipe)
+			{
+				*m = m_current;
+				i_closet = i;
+				t_pipe = current;
+			}
+			i++;
+		}
+		if (t_pipe < MAXFLOAT)
+		{
+			float3 pos = ray_origin + ray_dir * t_pipe;
+			float3 normal = find_normal(&obj->objs[i_closet], pos, *m);
+			if (dot(ray_dir, normal) > 0.0f)
+			{
+				*closest = &obj->objs[i_closet];
+				return (t_pipe);
+			}
+		}
+	}
+	*closest = NULL;
+	if (t_min <= 0)
+	{
+		*m = side.y;
+		t_min = t_max;
+	}
+	if (t_min > 0)
+	{
+		int i = 0;
+		float3 pos = ray_origin + ray_dir * t_min;
+		while (i < obj->pipes_number)
+		{
+			float3 temp = obj->objs[i].spec.cylinder.origin - pos;
+			if (length(temp - dot(temp, obj->objs[i].spec.cylinder.normal) * obj->objs[i].spec.cylinder.normal) < obj->objs[i].spec.cylinder.radius)
+				return (-1);
+			i++;
+		}
+	}
+	*m = side.x;
+	return (t_min);
+}
+
+static float3	cube_normal(constant t_cube *obj, float3 pos, float m)
+{
+	float3 	normal = {0, 0, 0};
+	normal[(int)m] = 1;
+	return (normal);
+}
+
 static void		intersect(	constant t_object *obj,
 							float3 ray_dir,
 							float3 ray_orig,
@@ -556,13 +685,16 @@ static void		intersect(	constant t_object *obj,
 		case bool_intersection:
 			current = bool_intersection_intersect(&obj->spec.bool_intersection, ray_dir, ray_orig, &closest_obj);
 			break;
+		case cube:
+			current = cube_intersect(&obj->spec.cube, ray_dir, ray_orig, m, &closest_obj);
+			break;
 		default:
 			break;
 	}
 	if (current <= 0.0 || current > *closest_dist)
 		return ;
 	*closest_dist = current;
-	if (obj->type == bool_substraction || obj->type == bool_intersection)
+	if (obj->type == bool_substraction || obj->type == bool_intersection || (obj->type == cube && closest_obj))
 		*closest = closest_obj;
 	else
 		*closest = obj;
@@ -623,6 +755,8 @@ static float3	find_normal(constant t_object *obj, float3 ray_orig, float m)
 			return (triangle_normal(&obj->spec.triangle));
 		case mobius:
 			return (mobius_normal(&obj->spec.mobius, ray_orig));
+		case cube:
+			return (cube_normal(&obj->spec.cube, ray_orig, m));
 		default:
 			break;
 	}
@@ -645,9 +779,9 @@ static void	trace_ray(float3 ray_orig, float3 ray_dir, /*t_scene scene,*/ t_hit 
 		hit->old_dir = ray_dir;
 		hit->mask *= closest->color;
 		hit->normal = find_normal(closest, hit->pos, hit->m);
-		if (closest->material.z > 0.0f)
+		if (closest->material.z > 0.01f)
 			hit->material = specular;
-		else if (closest->material.y > 0.0f)
+		else if (closest->material.y > 0.01f)
 			hit->material = refraction;
 		else
 		{

@@ -28,7 +28,8 @@ typedef enum	e_obj_type
 	triangle,
 	mobius,
 	bool_substraction,
-	bool_intersection
+	bool_intersection,
+	cube
 }				t_obj_type;
 
 typedef enum	e_material
@@ -109,6 +110,14 @@ typedef struct	s_bool_intersection
 	const __constant	struct s_object	*obj2;
 }				t_bool_intersection;
 
+typedef struct	s_cube
+{
+	float3		min;
+	float3		max;
+	int 		pipes_number;
+	const __constant	struct s_object	*objs;
+}				t_cube;
+
 typedef	union	u_specs
 {
 	t_plane		plane;
@@ -121,6 +130,7 @@ typedef	union	u_specs
 	t_mobius	mobius;
 	t_bool_substraction bool_substraction;
 	t_bool_intersection bool_intersection;
+	t_cube		cube;
 }				t_specs;
 
 typedef struct	s_object
@@ -164,5 +174,7 @@ typedef struct			s_hit
 	t_material			material;
 }						t_hit;
 # endif
+
+static float3	find_normal(constant t_object *obj, float3 ray_orig, float m);
 
 #endif
