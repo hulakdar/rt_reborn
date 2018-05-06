@@ -16,6 +16,7 @@
 # ifndef NULL
 #  define NULL ((void *)0)
 # endif
+# define EPSILON 1e-3
 
 typedef enum	e_obj_type
 {
@@ -156,6 +157,24 @@ typedef struct	s_scene
 	constant t_object*	objects;
 	int					objects_num;
 }				t_scene;
+
+typedef	struct	s_equation
+{
+	bool 		flag;
+	float 		aa;
+	float 		pp;
+	float 		rr;
+	float 		q2;
+	float 		c;
+	float 		b;
+	float 		br;
+	float 		discr;
+	float 		real1;
+	float 		real2;
+	float 		im1;
+	float 		im2;
+	float2 		l;
+}				t_equation;
 
 # ifdef KERNEL_ONLY
 typedef struct			s_hit

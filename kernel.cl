@@ -44,12 +44,12 @@ static constant t_object	objs[] = {
 	//{{0,0,1}, {0,1,1}, 0, cylinder, {.cylinder = (t_cylinder){{-8,-10,35}, {0,1,0}, 4, 16, 16}}},
 	//{{0,0,1}, {0,1,1}, 0, cone, {.cone = (t_cone){{8,0,35}, {0,1,0}, 0.5, -7, 7}}},
 	//{{1,0,0}, {1,1,0}, 0, disk, {.disk = (t_disk){{0,0,25}, {1, 1, 1}, 9}}},
-	//{{0,0,1}, {0,1,0}, 0, torus, {.torus = (t_torus){{0,-8,35}, {0, 1, 0}, 25, 1}}},
+	{{0,0,1}, {0,1,0}, 0, torus, {.torus = (t_torus){{0,-8,35}, {0, 1, 0}, 25, 1}}},
 	//{{0,0,1}, {1,0,0}, 0, triangle, {.triangle = (t_triangle){{0,0,15}, {5, 0, 15}, {3, -5, 45}}}},
 	//{{0,0,1}, {0,1,0}, 0, bool_substraction, {.bool_substraction = (t_bool_substraction){&o1, &o2}}},
 	//{{0,0,1}, {0,1,0}, 0, bool_intersection, {.bool_intersection = (t_bool_intersection){&o3, &o4}}},
-	{{1,0,0}, {1,0.5,0}, 0, cube, {.cube = (t_cube){{-5,-5,15}, {0, 0, 20}, 1, pipes1}}},
-	{{1,0,0}, {1,0.5,0}, 0, cube, {.cube = (t_cube){{1,-5,15}, {6, 0, 17}, 4, pipes2}}}
+	//{{1,0,0}, {1,0.5,0}, 0, cube, {.cube = (t_cube){{-5,-5,15}, {0, 0, 20}, 1, pipes1}}},
+	//{{1,0,0}, {1,0.5,0}, 0, cube, {.cube = (t_cube){{1,-5,15}, {6, 0, 17}, 4, pipes2}}}
 	//{{0,0,1}, {1,0,0}, 0, mobius, {.mobius = (t_mobius){5, 1}}}
 };
 
@@ -267,7 +267,7 @@ static float3	disk_normal(constant t_disk *obj)
 	return (normalize(obj->normal));
 }
 
-static void	fourth_degree_equation(float4 *t, float A, float B, float C, float D, float E)
+/*static void	fourth_degree_equation(float4 *t, float A, float B, float C, float D, float E)
 {
 	float a = -3.0f * B * B / 8.0f / A / A + C / A;
 	float b = B * B * B / 8 / A / A / A - B * C / 2 / A / A + D / A;
@@ -284,9 +284,161 @@ static void	fourth_degree_equation(float4 *t, float A, float B, float C, float D
 	(*t)[1] = -B / 4.0f / A + (W - sqrt(-(3.0f * a + 2.0f * y + 2.0f * b / W))) / 2.0f;
 	(*t)[2] = -B / 4.0f / A + (-W + sqrt(-(3.0f * a + 2.0f * y - 2.0f * b / W))) / 2.0f;
 	(*t)[3] = -B / 4.0f / A + (-W - sqrt(-(3.0f * a + 2.0f * y - 2.0f * b / W))) / 2.0f;
+}*/
+
+static void sort(float3 *ua, float2 *l)
+{
+	if (fabs((*ua)[0]) > fabs((*ua)[1]) && fabs((*ua)[0]) > fabs((*ua)[2]))
+	{
+		(*l)[0] = (*ua)[0];
+		(*l)[1] = fabs((*ua)[1]) > fabs((*ua)[2]) ? (*ua)[1] : (*ua)[2];
+	}
+	else if (fabs((*ua)[1]) > fabs((*ua)[0]) && fabs((*ua)[1]) > fabs((*ua)[2]))
+	{
+		(*l)[0] = (*ua)[1];
+		(*l)[1] = fabs((*ua)[0]) > fabs((*ua)[2]) ? (*ua)[0] : (*ua)[2];
+	}
+	else
+	{
+		(*l)[0] = (*ua)[2];
+		(*l)[1] = fabs((*ua)[0]) > fabs((*ua)[1]) ? (*ua)[0] : (*ua)[1];
+	}
+}
+
+static void negative_discr_solution(t_equation *e)
+{
+	float 	n;
+	float 	bq3;
+	float 	beta;
+	float 	a3;
+	float3 	ua;
+
+	n = sqrt(e->b);
+	bq3 = n * n * n;
+	beta = (e->br / bq3 < 1.0f) ? acos(e->br / bq3) : 0.0f;
+	a3 = -2.0f * n;
+	ua[0] = a3 * cos(beta / 3.0f) - e->c / 3.0f;
+	ua[1] = a3 * cos((beta + 2.0f * M_PI) / 3.0f) - e->c / 3.0f;
+	ua[2] = a3 * cos((beta - 2.0f * M_PI) / 3.0f) - e->c / 3.0f;
+	e->flag = false;
+	sort(&ua, &(e->l));
+	if (e->l[0] >= 0.0f)
+	{
+		e->real1 = sqrt(e->l[0]);
+		e->im1 = 0.0f;
+	}
+	else
+	{
+		e->im1 = sqrt(-e->l[0]);
+		e->real1 = 0.0f;
+	}
+	if (e->l[1] >= 0.0f)
+	{
+		e->im2 = 0.0f;
+		e->real2 = sqrt(e->l[1]);
+	}
+	else
+	{
+		e->real2 = 0.0f;
+		e->im2 = sqrt(-e->l[1]);
+	}
+}
+
+static void positive_discr_solution(t_equation *e)
+{
+	float 	n;
+	float 	a3;
+	float3 	ua;
+	float 	n2;
+	float 	u2;
+
+	n = (e->br < 0.0f) ? -1.0f : 1.0f;
+	a3 = -n * cbrt(fabs(e->br) + sqrt(e->discr));
+	ua[0] = a3 + e->b / a3 - e->c / 3.0f;
+	ua[1] = -0.5f * ((a3 * a3 + e->b) / a3) - e->c / 3.0f;
+	ua[2] = -(sqrt(3.0f) / 2.0f) * fabs(a3 - (e->b / a3));
+	e->flag = true;
+	n2 = sqrt(sqrt(ua[1] * ua[1] + ua[2] * ua[2]));
+	u2 = atan2(ua[2], ua[1]);
+	e->real1 = n2 * cos(u2 * 0.5f);
+	e->im1 = n2 * sin(u2 * 0.5f);
+	e->real2 = e->real1;
+	e->im2 = -e->im1;
+}
+
+static int	fourth_degree_equation(float4 *t, float4 a)
+{
+	float	res;
+	float	im_re1;
+	float	im_re2;
+	float	komp;
+	t_equation 	e;
+
+	e.aa = a[0] * a[0];
+	e.pp = a[1] - 0.375f * e.aa;
+	e.rr = a[3] - 0.25f * (a[0] * a[2] - 0.25f * e.aa * (a[1] - 0.1875f * e.aa));
+	e.q2 = a[2] - 0.5f * a[0] * (a[1] - 0.25f * e.aa);
+	e.c = 0.5f * e.pp;
+	e.aa = 0.25f * (0.25f * e.pp * e.pp - e.rr);
+	e.b = e.c * e.c / 9.0f - e.aa / 3.0f;
+	e.br = e.c * e.c * e.c / 27.0f - e.c * e.aa / 6.0f - (0.125f * e.q2 * 0.125f * e.q2) / 2.0f;
+	e.discr = ((e.br * e.br) - (e.b * e.b * e.b));
+	if (e.discr < 0.0f)
+		negative_discr_solution(&e);
+	else
+		positive_discr_solution(&e);
+	im_re1 = e.im1 * e.im1 + e.real1 * e.real1;
+	im_re2 = e.im2 * e.im2 + e.real2 * e.real2;
+	komp = e.im1 * e.im2 - e.real1 * e.real2;
+	res = e.q2 * 0.125f * komp / im_re1 / im_re2;
+	(*t)[0] = e.real1 + e.real2 + res - a[0] * 0.25f;
+	(*t)[1] = -e.real1 - e.real2 + res - a[0] * 0.25f;
+	(*t)[2] = -e.real1 + e.real2 - res - a[0] * 0.25f;
+	(*t)[3] = e.real1 - e.real2 - res - a[0] * 0.25f;
+	if (!e.flag && e.l[0] >= 0.0f && e.l[1] >= 0.0f)
+		return (4);
+	else if (!e.flag)
+		return (0);
+	else
+		return (2);
 }
 
 static float  torus_intersect(constant t_torus *obj,
+								float3 ray_dir,
+								float3 ray_origin)
+{
+	int		count_roots;
+	int		i;
+	float4	u;
+	float4	x;
+	float	l;
+	float3 	oc;
+	float4	qq;
+	float4 	dots;
+
+	oc = ray_origin - obj->origin;
+	dots[0] = dot(oc, obj->normal);
+	dots[1] = dot(ray_dir, obj->normal);
+	dots[2] = dot(oc, oc);
+	dots[3] = dot(oc, ray_dir);
+	qq[0] = 1.0f - dots[1] * dots[1];
+	qq[1] = 2.0f * (dots[3] - dots[0] * dots[1]);
+	qq[2] = dots[2] - dots[0] * dots[0];
+	qq[3] = dots[2] + obj->big_radius2 - obj->small_radius2;
+	u[0] = 4.0f * dots[3];
+	u[1] = 2.0f * qq[3] + u[0] * u[0] * 0.25f - 4.0f * obj->big_radius2 * qq[0];
+	u[2] = u[0] * qq[3] - 4.0f * obj->big_radius2 * qq[1];
+	u[3] = qq[3] * qq[3] - 4.0f * obj->big_radius2 * qq[2];
+	count_roots = fourth_degree_equation(&x, u);
+	i = -1;
+	l = MAXFLOAT;
+	while (count_roots > ++i)
+		if (x[i] < l && x[i] > 0)
+			l = x[i];
+	return ((l < MAXFLOAT) ? l : -1);
+}
+
+/*static float  torus_intersect(constant t_torus *obj,
 								float3 ray_dir,
 								float3 ray_origin)
 {
@@ -325,7 +477,23 @@ static float  torus_intersect(constant t_torus *obj,
 		i++;
 	}
 	return ((ret < 999.0f) ? ret : -1);
-}
+}*/
+
+/*static float3 torus_normal(constant t_torus *obj, float3 pos)
+{
+	float3	cent;
+	float	k;
+	float3	a;
+
+	cent = pos - obj->origin;
+	k = dot(obj->normal, cent);
+	a = obj->normal * k;
+	a = cent - a;
+	k = dot(a, a);
+	k = 1 / sqrt(k) * sqrt(obj->big_radius2);
+	cent = pos - a - (obj->origin - a) * k / (sqrt(obj->big_radius2) + k);
+	return (normalize(cent));
+}*/
 
 static float3	torus_normal(constant t_torus *obj, float3 pos)
 {
@@ -623,7 +791,7 @@ static float  cube_intersect(constant t_cube *obj,
 		*m = side.y;
 		t_min = t_max;
 	}
-	if (t_min > 0)
+	if (t_min > 0 && obj->objs)
 	{
 		int i = 0;
 		float3 pos = ray_origin + ray_dir * t_min;
